@@ -1,6 +1,5 @@
 package com.slickqa.executioner;
 
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 
 /**
@@ -14,7 +13,18 @@ public class VertxContextConfiguration implements Configuration {
         this.config = config;
     }
 
-    public String getUrlBasePath() {
-        return config.getString("urlBasePath", "/");
+    @Override
+    public String getPathToAgentConfigs() {
+        return config.getString("agents", "agents");
+    }
+
+    @Override
+    public int getWorkQueueSize() {
+        return config.getInteger("workQueueSize", 20);
+    }
+
+    @Override
+    public int getWorkQueueBroadcastInterval() {
+        return 30;
     }
 }
