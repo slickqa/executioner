@@ -1,9 +1,10 @@
-package com.slickqa.executioner;
+package com.slickqa.executioner.base;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.multibindings.Multibinder;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.file.FileSystem;
 import io.vertx.core.shareddata.SharedData;
 import org.reflections.Reflections;
 
@@ -15,12 +16,12 @@ import java.util.*;
  *
  */
 public class ExecutionerGuiceModule extends AbstractModule {
-    private final Vertx vertx;
+    protected final Vertx vertx;
     private final Reflections reflections;
 
-    public ExecutionerGuiceModule(Vertx vertx) {
+    public ExecutionerGuiceModule(Vertx vertx, String basePackage) {
         this.vertx = vertx;
-        reflections = new Reflections("com.slickqa");
+        reflections = new Reflections(basePackage);
     }
 
     @Override
@@ -28,13 +29,14 @@ public class ExecutionerGuiceModule extends AbstractModule {
         bind(Vertx.class).toInstance(vertx);
         bind(EventBus.class).toInstance(vertx.eventBus());
         bind(SharedData.class).toInstance(vertx.sharedData());
-        bind(Configuration.class).toInstance(new VertxContextConfiguration(vertx.getOrCreateContext().config()));
+        bind(FileSystem.class).toInstance(vertx.fileSystem());
         Set<Class> collectables = new HashSet<Class>();
         for(Class cls : reflections.getTypesAnnotatedWith(CollectableComponentType.class)) {
             if(cls.isInterface()) {
                 collectables.add(cls);
             }
         }
+        collectables.add(OnStartup.class);
         addBindingsFor(collectables);
     }
 

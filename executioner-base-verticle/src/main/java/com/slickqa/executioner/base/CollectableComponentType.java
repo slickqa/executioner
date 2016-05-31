@@ -1,4 +1,4 @@
-package com.slickqa.executioner;
+package com.slickqa.executioner.base;
 
 /**
  * Any interface annotated with this annotation will be able to have

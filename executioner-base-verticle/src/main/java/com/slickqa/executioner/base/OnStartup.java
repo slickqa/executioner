@@ -1,4 +1,4 @@
-package com.slickqa.executioner;
+package com.slickqa.executioner.base;
 
 /**
  * This interface is for a class that wants a method to be called on startup.

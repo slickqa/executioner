@@ -1,4 +1,4 @@
-package com.slickqa.executioner;
+package com.slickqa.executioner.base;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;

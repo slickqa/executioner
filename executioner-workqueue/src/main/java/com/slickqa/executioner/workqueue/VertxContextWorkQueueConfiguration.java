@@ -1,4 +1,4 @@
-package com.slickqa.executioner;
+package com.slickqa.executioner.workqueue;
 
 import io.vertx.core.json.JsonObject;
 
@@ -6,16 +6,11 @@ import io.vertx.core.json.JsonObject;
  * Slick configuration that uses Vertx Context configuration to
  * override defaults.
  */
-public class VertxContextConfiguration implements Configuration {
+public class VertxContextWorkQueueConfiguration implements WorkQueueConfiguration {
     private JsonObject config;
 
-    public VertxContextConfiguration(JsonObject config) {
+    public VertxContextWorkQueueConfiguration(JsonObject config) {
         this.config = config;
-    }
-
-    @Override
-    public String getPathToAgentConfigs() {
-        return config.getString("agents", "agents");
     }
 
     @Override
