@@ -66,7 +66,14 @@ gulp.task('build', ['clean'], function(done){
 gulp.task('sass', buildSass);
 gulp.task('html', copyHTML);
 gulp.task('fonts', copyFonts);
-gulp.task('scripts', copyScripts);
+//gulp.task('scripts', copyScripts);
+gulp.task('scripts', function(options) {
+    copyScripts({src: [
+        'node_modules/vertx3-eventbus-client/vertx-eventbus.js'
+    ]});
+    return copyScripts(options);
+});
+
 gulp.task('clean', function(){
   return del('www/build');
 });

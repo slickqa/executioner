@@ -117,14 +117,14 @@ public class WorkQueue implements OnStartup {
                         log.warn("Unknown provider type ({0}): {1}", item.getClass().getName(), item.toString());
                     }
                 }
-                for (int i = workQueue.size() - 1; i > 0; i--) {
+                for (int i = workQueue.size() - 1; i >= 0; i--) {
                     WorkQueueItem item = workQueue.get(i);
                     if(provides.containsAll(item.getRequirements())) {
                         itemToAssign = i;
                         break;
                     }
                 }
-                if(itemToAssign > 0) {
+                if(itemToAssign >= 0) {
                     WorkQueueItem assignment = workQueue.remove(itemToAssign);
                     message.reply(assignment.toJsonObject());
                     publishQueueInfo();

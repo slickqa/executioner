@@ -13,6 +13,7 @@
         <module>executioner-workqueue</module>
         <module>executioner-web</module>
         <module>executioner-executable</module>
+        <module>executioner-dummyagent</module>
     </modules>
 
     <properties>
