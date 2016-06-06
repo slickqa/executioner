@@ -2,6 +2,13 @@ import {Page} from 'ionic-angular';
 
 declare var EventBus: any;
 
+// Array Remove - By John Resig (MIT Licensed)
+Array.prototype.remove = function(from, to) {
+  var rest = this.slice((to || from) + 1 || this.length);
+  this.length = from < 0 ? this.length + from : from;
+  return this.push.apply(this, rest);
+};
+
 @Page({
   templateUrl: 'build/pages/main/main.html'
 })
@@ -40,7 +47,7 @@ export class MainPage {
       
       that.eb.registerHandler('executioner.agent.update', function(error, message) {
         that.agents[message.body.name] = message.body;
-        if(!(message.body.name in that.agentImages)) {
+        if(!(message.body.name in that.agentImages) && !(message.body.agentUndeployRequested)) {
           that.agentNames.push(message.body.name);
         } 
         if(!("assignment" in message.body)) {
@@ -50,16 +57,9 @@ export class MainPage {
       that.eb.publish('executioner.agent.queryall', function(error, message) {});
 
       that.eb.registerHandler('executioner.agent.delete', function(error, message) {
-        if(message.body.name in that.agents) {
-          delete that.agents[message.body.name];
-        }
         let index = that.agentNames.indexOf(message.body.name);
         if(index > -1) {
-          console.log("deleting name " + message.body.name + " at index " + index);
-          delete that.agentNames[index];
-        }
-        if(message.body.name in that.agentImages) {
-          delete that.agentImages[message.body.name];
+          that.agentNames.remove(index);
         }
       });
       
@@ -67,6 +67,6 @@ export class MainPage {
       //  that.projects = message.body;
       //});
     };
-    // for debugging:  window.currentPage = this;
+    window.currentPage = this;
   }
 }
