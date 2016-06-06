@@ -47,14 +47,17 @@ export class MainPage {
       
       that.eb.registerHandler('executioner.agent.update', function(error, message) {
         that.agents[message.body.name] = message.body;
-        if(!(message.body.name in that.agentImages) && !(message.body.agentUndeployRequested)) {
+        if(that.agentNames.indexOf(message.body.name) < 0 && !(message.body.agentUndeployRequested)) {
           that.agentNames.push(message.body.name);
         } 
         if(!("assignment" in message.body)) {
           that.agentImages[message.body.name] = "images/no-current-image.png";
         }
       });
-      that.eb.publish('executioner.agent.queryall', function(error, message) {});
+      that.eb.publish('executioner.agent.queryall', null, function(error, message) {});
+      that.eb.send('executioner.workqueue.query', null, function(error, message) {
+        that.workqueue = message.body;
+      });
 
       that.eb.registerHandler('executioner.agent.delete', function(error, message) {
         let index = that.agentNames.indexOf(message.body.name);

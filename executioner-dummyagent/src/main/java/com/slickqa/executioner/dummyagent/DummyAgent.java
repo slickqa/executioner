@@ -64,7 +64,7 @@ public class DummyAgent implements OnStartup {
                 }
             }
         });
-        eventBus.consumer(Addresses.AgentStopBaseAddress + agent.getString("name")).handler(message -> { timeToStop = true; message.reply(agentUpdateObject());});
+        eventBus.consumer(Addresses.AgentStopBaseAddress + agent.getString("name")).handler(message -> { timeToStop = true; message.reply(agentUpdateObject()); if(currentWork == null) askForWork();});
         broadcastInfo();
     }
 

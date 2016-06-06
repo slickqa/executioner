@@ -8,6 +8,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
+import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.file.FileSystem;
 import io.vertx.core.json.JsonObject;
@@ -28,11 +29,12 @@ public class DeployVerticle extends AbstractVerticle {
 
     private boolean[] webVerticleStarted;
     private FileSystem fs;
+    private EventBus eventBus;
     private Logger log;
     private String locationOfAgents;
     private String agentImagesDirectory;
     private Map<String, JsonObject> redeploy;
-    private Set<String> deployedAgentNames;
+    private Map<String, JsonObject> agents;
     private int dummyAgentCounter;
 
     protected boolean allWebVerticleStarted() {
@@ -44,7 +46,7 @@ public class DeployVerticle extends AbstractVerticle {
         return true;
     }
 
-    public void deployAgent(JsonObject config) {
+    public boolean deployAgent(JsonObject config) {
         String name = config.getString("name");
         if(name == null) {
             log.error("Trying to deploy an agent without a name, must be a bug.  JSON={0}", config.encodePrettily());
@@ -57,9 +59,72 @@ public class DeployVerticle extends AbstractVerticle {
                 DeploymentOptions options = new DeploymentOptions();
                 options.setConfig(config);
                 vertx.deployVerticle(new DummyAgentVerticle(), options);
-                deployedAgentNames.add(name);
+                agents.put(name, config);
+                return true;
             }
         }
+        return false;
+    }
+
+    public void loadAgents(Long id) {
+        Set<String> loaded = new HashSet<>();
+        Set<String> pathsLoaded = new HashSet<>();
+        fs.readDir(locationOfAgents, readDirResult -> {
+            if(readDirResult.succeeded()) {
+                log.info("Starting load of agents from {0}.", locationOfAgents);
+
+                for(String path : readDirResult.result()) {
+                    if(path.endsWith(".json")) {
+                        fs.readFile(path, readFileResult -> {
+                            pathsLoaded.add(path);
+                            if(readFileResult.succeeded()) {
+                                JsonObject config = new JsonObject(readFileResult.result().toString());
+                                if(!config.containsKey("name")) {
+                                    // name can come from file name
+                                    String name = path.substring(path.lastIndexOf('/') + 1);
+                                    name = name.substring(0, name.length() - 5); // take off .json
+                                    config = config.put("name", name);
+                                }
+                                String agentName = config.getString("name");
+                                if(!agents.containsKey(agentName)) {
+                                    log.info("Attempting to deploy {0}", agentName);
+                                    if(deployAgent(config)) {
+                                        loaded.add(agentName);
+                                    } else {
+                                        log.error("Unable to deploy agent {0} with json: {1}", agentName, config.encodePrettily());
+                                    }
+                                } else {
+                                    // already deployed, let's see if it's different
+                                    if(!config.equals(agents.get(agentName))) {
+                                        log.info("config {0} does not equal {1}", config.encodePrettily(), agents.get(agentName).encodePrettily());
+                                        // even though we are unloading and reloading, we'll record this as "loaded"
+                                        loaded.add(agentName);
+                                        // it's different, reload
+                                        redeploy.put(agentName, config);
+                                        eventBus.send(Addresses.AgentStopBaseAddress + agentName, null);
+                                    } else {
+                                        loaded.add(agentName);
+                                    }
+                                }
+                            } else {
+                                log.error("Unable to read file {0}");
+                            }
+                            if(pathsLoaded.containsAll(readDirResult.result())) {
+                                // look for agents to "unload"
+                                Set<String> toUnload = new HashSet<>(agents.keySet());
+                                toUnload.removeAll(loaded);
+                                for(String agentNameToUnload : toUnload) {
+                                    log.info("Unloading agent {0}", agentNameToUnload);
+                                    eventBus.send(Addresses.AgentStopBaseAddress + agentNameToUnload, null);
+                                }
+                            }
+                        });
+                    }
+                }
+            } else {
+                log.error("Unable to load agents from directory [" + locationOfAgents + "] : ", readDirResult.cause());
+            }
+        });
     }
 
     public void cleanupImages(Long id) {
@@ -91,13 +156,15 @@ public class DeployVerticle extends AbstractVerticle {
     }
 
 
+
     @Override
     public void start(Future<Void> startFuture) {
         dummyAgentCounter = 0;
         redeploy = new HashMap<>();
-        deployedAgentNames = new HashSet<>();
+        agents = new HashMap<>();
         log = LoggerFactory.getLogger(DeployVerticle.class);
         fs = vertx.fileSystem();
+        eventBus = vertx.eventBus();
 
         log.info("Starting Work Queue.");
 
@@ -107,6 +174,7 @@ public class DeployVerticle extends AbstractVerticle {
         locationOfAgents = config.getString("agentsDir", "conf.d");
         agentImagesDirectory = config.getString("agentImagesDir", "agent-images");
         int cleanupImagesEvery = config.getInteger("cleanupImagesEvery", 10);
+        int checkAgentsEvery = config.getInteger("checkAgentsEvery", 60);
 
 
         webVerticleStarted = new boolean[numberOfWebVerticles];
@@ -115,7 +183,7 @@ public class DeployVerticle extends AbstractVerticle {
         }
 
         // undeploy an agent as soon as it sends out a stop message
-        vertx.eventBus().consumer(Addresses.AgentDeleteAnnounce, message -> {
+        eventBus.consumer(Addresses.AgentDeleteAnnounce, message -> {
             Object body = message.body();
             if(body instanceof JsonObject) {
                 JsonObject agent = (JsonObject) body;
@@ -123,7 +191,7 @@ public class DeployVerticle extends AbstractVerticle {
                 vertx.undeploy(agent.getString("deploymentId"), whenFinished -> {
                     if(whenFinished.succeeded()) {
                         // remove it as a deployed agent
-                        deployedAgentNames.remove(agent.getString("name"));
+                        agents.remove(agent.getString("name"));
                         // if it's scheduled to be redeployed, do that
                         if(redeploy.containsKey(agent.getString("name"))) {
                             log.info("Redeploying agent {0}", agent.getString("name"));
@@ -161,12 +229,8 @@ public class DeployVerticle extends AbstractVerticle {
             }
         });
 
+        loadAgents(0L);
         vertx.setPeriodic(cleanupImagesEvery * 1000, this::cleanupImages);
-
-        // temporary
-        for(int i = 0; i < config.getInteger("dummyAgents", 5); i++) {
-            deployAgent(new JsonObject().put("name", "dummyagent-" + i).put("agentNumber", i));
-        }
-
+        vertx.setPeriodic(checkAgentsEvery * 1000, this::loadAgents);
     }
 }
