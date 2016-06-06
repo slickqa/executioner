@@ -1,0 +1,11 @@
+<ion-navbar *navbar>
+  <ion-title>Executioner Status (Queue Size: {{workqueue.length}})</ion-title>
+</ion-navbar>
+<ion-content>
+  <ion-row class="agent-row" responsive-sm>
+    <ion-card class="agent" *ngFor="let agentName of agentNames;">
+      <ion-card-header>{{agentName}}</ion-card-header>
+      <ion-card-content><img [src]="agentImages[agentName]" /></ion-card-content>
+    </ion-card>
+  </ion-row>
+</ion-content>

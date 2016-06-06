@@ -21,4 +21,9 @@ public class ExecutionerWebConfigurationImpl  implements ExecutionerWebConfigura
     public String getWebBasePath() {
         return config.getString("executionerWebBaseUrl", "/");
     }
+
+    @Override
+    public String getAgentImagesDir() {
+        return config.getString("agentImagesDir", "agent-images/");
+    }
 }

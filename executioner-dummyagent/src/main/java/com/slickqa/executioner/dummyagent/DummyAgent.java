@@ -31,6 +31,8 @@ public class DummyAgent implements OnStartup {
     private Logger log;
     private String imageAddress;
     private FileSystem fs;
+    private boolean requestedWork;
+    private boolean timeToStop;
 
     @Inject
     public DummyAgent(EventBus eventBus, DummyAgentConfiguration config, Vertx vertx, FileSystem fs) {
@@ -44,7 +46,10 @@ public class DummyAgent implements OnStartup {
         this.log = LoggerFactory.getLogger(DummyAgent.class.getName() + "." + "dummyagent-" + config.getDummyAgentNumber());
         this.imageAddress = Addresses.AgentImageBaseAddress + "dummyagent-" + config.getDummyAgentNumber();
         this.agent = agent.put("imageAddress", imageAddress);
+        this.agent = agent.put("deploymentId", vertx.getOrCreateContext().deploymentID());
         this.fs = fs;
+        this.requestedWork = false;
+        this.timeToStop = false;
     }
 
     @Override
@@ -59,13 +64,14 @@ public class DummyAgent implements OnStartup {
                 }
             }
         });
+        eventBus.consumer(Addresses.AgentStopBaseAddress + agent.getString("name")).handler(message -> { timeToStop = true; message.reply(agentUpdateObject());});
         broadcastInfo();
     }
 
     protected JsonObject agentUpdateObject() {
         JsonObject current = agent;
         if(currentWork != null) {
-            current = agent.copy().put("assignment", currentWork);
+            current = agent.copy().put("assignment", currentWork).put("agentUndeployRequested", timeToStop);
         }
         return current;
     }
@@ -77,17 +83,28 @@ public class DummyAgent implements OnStartup {
 
     public void askForWork() {
         // don't ask for work if we already have some
-        if(currentWork == null) {
-            log.info("Asking for work for dummyagent-{0}", config.getDummyAgentNumber());
-            eventBus.send(Addresses.WorkQueueRequestWork, agent, response -> {
-                if (response.succeeded() && response.result().body() instanceof JsonObject) {
-                    log.info("Recieved work from WorkQueue: {0}", Json.encodePrettily(response.result().body()));
-                    currentWork = (JsonObject)response.result().body();
-                    startWork();
-                } else {
-                    log.info("No work because: {0}", response.cause().getMessage());
-                }
-            });
+        if(currentWork == null && !requestedWork) {
+            if(timeToStop) {
+                log.info("Dummy Agent {0} requested to stop!", agent.getString("name"));
+                eventBus.publish(Addresses.AgentDeleteAnnounce, agentUpdateObject());
+                requestedWork = true; // this will keep us from ever requesting work again and ensure we only send stop once
+            } else {
+                log.info("Asking for work for dummyagent-{0}", config.getDummyAgentNumber());
+
+                // avoid requesting work more than once before we get the first response
+                requestedWork = true;
+                eventBus.send(Addresses.WorkQueueRequestWork, agent, response -> {
+                    if (response.succeeded() && response.result().body() instanceof JsonObject) {
+                        log.info("Recieved work from WorkQueue: {0}", Json.encodePrettily(response.result().body()));
+                        currentWork = (JsonObject) response.result().body();
+                        requestedWork = false;
+                        startWork();
+                    } else {
+                        requestedWork = false;
+                        log.info("No work because: {0}", response.cause().getMessage());
+                    }
+                });
+            }
         }
     }
 

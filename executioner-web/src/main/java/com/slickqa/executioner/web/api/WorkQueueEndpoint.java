@@ -54,6 +54,8 @@ public class WorkQueueEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
         eventBus.consumer(Addresses.WorkQueueInfo).handler(this::onWorkQueueUpdated);
         router.route(HttpMethod.GET, config.getWebBasePath() + "api/workqueue").handler(this::getCurrentWorkQueue);
         router.route(HttpMethod.POST, config.getWebBasePath() + "api/workqueue").handler(this::addToWorkQueue);
+        router.route(HttpMethod.GET, config.getWebBasePath() + "api/workqueue/stop").handler(this::stopWorkQueue);
+        router.route(HttpMethod.GET, config.getWebBasePath() + "api/workqueue/start").handler(this::startWorkQueue);
     }
 
     public void onWorkQueueUpdated(Message<Object> message) {
@@ -69,6 +71,24 @@ public class WorkQueueEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
     @Override
     public void addToSocksJSBridgeOptions(BridgeOptions options) {
         options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueInfo));
+    }
+
+    public void stopWorkQueue(RoutingContext ctx) {
+        eventBus.send(Addresses.WorkStop, null, message -> {
+            ctx.response()
+                    .setStatusCode(200)
+                    .putHeader("Content-Type", "application/json")
+                    .end(Json.encodePrettily(message.result().body()));
+        });
+    }
+
+    public void startWorkQueue(RoutingContext ctx) {
+        eventBus.send(Addresses.WorkStart, null, message -> {
+            ctx.response()
+                    .setStatusCode(200)
+                    .putHeader("Content-Type", "application/json")
+                    .end(Json.encodePrettily(message.result().body()));
+        });
     }
 
     public void getCurrentWorkQueue(RoutingContext ctx) {

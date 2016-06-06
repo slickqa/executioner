@@ -7,14 +7,18 @@ import com.slickqa.executioner.base.AutoloadComponent;
 import com.slickqa.executioner.base.OnStartup;
 import com.slickqa.executioner.web.AddsSocksJSBridgeOptions;
 import com.slickqa.executioner.web.ExecutionerWebConfiguration;
+import com.sun.jndi.cosnaming.IiopUrl;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.file.FileSystem;
+import io.vertx.core.http.HttpMethod;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.sockjs.BridgeOptions;
 import io.vertx.ext.web.handler.sockjs.PermittedOptions;
 
@@ -50,6 +54,26 @@ public class AgentsEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
         eventBus.consumer(Addresses.AgentUpdate).handler(this::handleAgentUpdates);
         // query all agents
         eventBus.send(Addresses.AgentQuery, null);
+        router.route(HttpMethod.DELETE, config.getWebBasePath() + "api/agents/:agentName").handler(this::removeAgent);
+    }
+
+    public void removeAgent(RoutingContext ctx) {
+        String agentName = ctx.request().getParam("agentName");
+        if(agents.containsKey(agentName)) {
+            eventBus.send(Addresses.AgentStopBaseAddress + ctx.request().getParam("agentName"), null, response -> {
+                ctx.response()
+                        .setStatusCode(200)
+                        .putHeader("Content-Type", "application/json")
+                        .end(Json.encodePrettily(response.result().body()));
+            });
+        } else {
+            ctx.response()
+                    .setStatusCode(404)
+                    .putHeader("Content-Type", "application/json")
+                    .end(new JsonObject()
+                            .put("error", "Agent with name [" + agentName + "] not found.")
+                            .encodePrettily());
+        }
     }
 
     public void handleAgentUpdates(Message<Object> message) {
@@ -68,27 +92,11 @@ public class AgentsEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
 
     private void writeImage(String agentName, Buffer image) {
         long timestamp = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
-        String imageFileName = "agent-images/" + agentName + "/" + timestamp + ".png";
+        String imageFileName = config.getAgentImagesDir() + agentName + "/" + timestamp + ".png";
         fs.writeFile(imageFileName, image, result -> {
             if(result.succeeded()) {
                 log.info("Publishing image update for agent {0}: {1}", agentName, imageFileName);
                 eventBus.publish(AddressForAgentImageUpdate, new JsonObject().put("name", agentName).put("url", imageFileName));
-/*                fs.readDir("agent-images/" + agentName, dirResult -> {
-                    if(dirResult.succeeded()) {
-                        for(String fileName : dirResult.result()) {
-                            if(!fileName.endsWith(imageFileName)) {
-                                log.info("Cleaning up old image {0}", fileName);
-                                fs.delete(fileName, deleteResult -> {
-                                    if(deleteResult.failed()) {
-                                        log.error("Unable to delete old file " + fileName + ": ", deleteResult.cause());
-                                    }
-                                });
-                            }
-                        }
-                    } else {
-                        log.warn("Unable to clean up old images for " + agentName + ": ", dirResult.cause());
-                    }
-                }); */
             } else {
                 log.error("Unable to write file " + imageFileName + ": ", result.cause());
             }
@@ -101,11 +109,11 @@ public class AgentsEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
             Buffer image = (Buffer) body;
             String address = message.address();
             String nameOfAgent = address.substring(address.lastIndexOf('.') + 1);
-            fs.exists("agent-images/" + nameOfAgent, result -> {
+            fs.exists(config.getAgentImagesDir() + nameOfAgent, result -> {
                 if(result.succeeded() && result.result()) {
                     writeImage(nameOfAgent, image);
                 } else {
-                    fs.mkdir("agent-images/" + nameOfAgent, mkdirResult -> {
+                    fs.mkdir(config.getAgentImagesDir() + nameOfAgent, mkdirResult -> {
                         if(mkdirResult.succeeded()) {
                             writeImage(nameOfAgent, image);
                         } else {
@@ -127,5 +135,6 @@ public class AgentsEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
         options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.AgentUpdate));
         options.addInboundPermitted(new PermittedOptions().setAddress(Addresses.AgentQuery));
         options.addOutboundPermitted(new PermittedOptions().setAddress(AddressForAgentImageUpdate));
+        options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.AgentDeleteAnnounce));
     }
 }

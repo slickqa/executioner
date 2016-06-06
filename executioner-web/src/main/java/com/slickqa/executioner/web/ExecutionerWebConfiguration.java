@@ -6,4 +6,5 @@ package com.slickqa.executioner.web;
 public interface ExecutionerWebConfiguration {
     int getWebPort();
     String getWebBasePath();
+    String getAgentImagesDir();
 }

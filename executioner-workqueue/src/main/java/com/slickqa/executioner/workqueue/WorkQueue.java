@@ -34,6 +34,7 @@ public class WorkQueue implements OnStartup {
     private LocalDateTime broadcastAfter;
     private List<WorkQueueItem> workQueue;
     private Logger log;
+    private boolean stopped;
 
     @Inject
     public WorkQueue(Vertx vertx, EventBus eventBus, WorkQueueConfiguration config) {
@@ -42,6 +43,7 @@ public class WorkQueue implements OnStartup {
         this.vertx = vertx;
         this.workQueue = new ArrayList<>(config.getWorkQueueSize());
         this.log = LoggerFactory.getLogger(WorkQueue.class);
+        this.stopped = false;
     }
 
     @Override
@@ -55,6 +57,8 @@ public class WorkQueue implements OnStartup {
         eventBus.consumer(WorkQueueAdd).handler(this::addToWorkQueueHandler);
         eventBus.consumer(WorkQueueQuery).handler(message -> message.reply(workQueueMessage()));
         eventBus.consumer(WorkQueueRequestWork).handler(this::requestWorkHandler);
+        eventBus.consumer(WorkStop).handler(message -> { this.stopped = true; message.reply(new JsonObject().put("stopped", stopped));});
+        eventBus.consumer(WorkStart).handler(message -> { this.stopped = false; message.reply(new JsonObject().put("stopped", stopped)); publishQueueInfo();});
     }
 
     private JsonArray workQueueMessage() {
@@ -95,11 +99,12 @@ public class WorkQueue implements OnStartup {
     }
 
     public void requestWorkHandler(Message<Object> message) {
-        if(workQueue.size() == 0) {
-            message.fail(10, "No work available");
-        }
         Object body = message.body();
-        if(body instanceof JsonObject) {
+        if(stopped) {
+            message.fail(5, "Work Stopped");
+        } else if(workQueue.size() == 0) {
+            message.fail(10, "No work available");
+        } else if(body instanceof JsonObject) {
             JsonObject request = (JsonObject)body;
             if(!request.containsKey(NameKey)) {
                 message.fail(20, "Must include a name of the agent in order to request work.");
