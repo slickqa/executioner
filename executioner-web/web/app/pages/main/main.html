@@ -5,7 +5,10 @@
   <ion-row class="agent-row" responsive-sm>
     <ion-card class="agent" *ngFor="let agentName of agentNames;">
       <ion-card-header>{{agentName}}</ion-card-header>
-      <ion-card-content><img [src]="agentImages[agentName]" /></ion-card-content>
+      <ion-card-content>
+        <p><img [src]="agentImages[agentName]" /></p>
+        <p *ngIf="agents[agentName].assignment && agents[agentName].assignment.name">{{agents[agentName].assignment.name}}</p>
+      </ion-card-content>
     </ion-card>
   </ion-row>
 </ion-content>

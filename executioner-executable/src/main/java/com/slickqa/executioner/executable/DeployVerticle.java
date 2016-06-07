@@ -1,13 +1,11 @@
 package com.slickqa.executioner.executable;
 
 import com.slickqa.executioner.base.Addresses;
+import com.slickqa.executioner.cmdlineagent.CommandLineAgentVerticle;
 import com.slickqa.executioner.dummyagent.DummyAgentVerticle;
 import com.slickqa.executioner.web.ExecutionerWebVerticle;
 import com.slickqa.executioner.workqueue.ExecutionerWorkQueueVerticle;
-import io.vertx.core.AbstractVerticle;
-import io.vertx.core.DeploymentOptions;
-import io.vertx.core.Future;
-import io.vertx.core.Handler;
+import io.vertx.core.*;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.file.FileSystem;
@@ -52,13 +50,19 @@ public class DeployVerticle extends AbstractVerticle {
             log.error("Trying to deploy an agent without a name, must be a bug.  JSON={0}", config.encodePrettily());
         } else {
             String type = config.getString("type", "DummyAgent");
+            DeploymentOptions options = new DeploymentOptions();
+            options.setConfig(config);
+            Verticle agent = null;
             if("DummyAgent".equalsIgnoreCase(type)) {
                 if(!config.containsKey("agentNumber")) {
                     config = config.put("agentNumber", ++dummyAgentCounter);
                 }
-                DeploymentOptions options = new DeploymentOptions();
-                options.setConfig(config);
-                vertx.deployVerticle(new DummyAgentVerticle(), options);
+                agent = new DummyAgentVerticle();
+            } else if("CommandLineAgent".equalsIgnoreCase(type)) {
+                agent = new CommandLineAgentVerticle();
+            }
+            if(agent != null) {
+                vertx.deployVerticle(agent, options);
                 agents.put(name, config);
                 return true;
             }
