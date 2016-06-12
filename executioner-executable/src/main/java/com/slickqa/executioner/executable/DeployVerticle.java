@@ -9,6 +9,7 @@ import io.vertx.core.*;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.file.FileSystem;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -68,6 +69,36 @@ public class DeployVerticle extends AbstractVerticle {
             }
         }
         return false;
+    }
+
+    public boolean deployConnector(JsonObject config) {
+        String connectorClassName = config.getString("className", null);
+        if(connectorClassName == null) {
+            log.error("Connector config className missing from connector config: {0}", config.encodePrettily());
+            return false;
+        }
+        Class connector = null;
+        try {
+            connector = this.getClass().getClassLoader().loadClass(connectorClassName);
+        } catch (ClassNotFoundException e) {
+            log.error("Unable to load class '" + connectorClassName + "': ", e);
+            return false;
+        }
+        if(!AbstractVerticle.class.isAssignableFrom(connector)) {
+            log.error("Connector class {0} is not a Verticle, we can't deploy it!", connectorClassName);
+            return false;
+        }
+        AbstractVerticle instance = null;
+        try {
+            instance = (AbstractVerticle)connector.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            log.error("Error creating instance of connector class '" + connectorClassName + "': ", e);
+            return false;
+        }
+        DeploymentOptions options = new DeploymentOptions().setConfig(config);
+        vertx.deployVerticle(instance, options);
+
+        return true;
     }
 
     public void loadAgents(Long id) {
@@ -234,6 +265,14 @@ public class DeployVerticle extends AbstractVerticle {
         });
 
         loadAgents(0L);
+
+        // ----- Deploy connectors -----
+        for(Object connectorConfig : config.getJsonArray("connectors", new JsonArray())) {
+            if(connectorConfig instanceof JsonObject) {
+                deployConnector((JsonObject)connectorConfig);
+            }
+        }
+
         vertx.setPeriodic(cleanupImagesEvery * 1000, this::cleanupImages);
         vertx.setPeriodic(checkAgentsEvery * 1000, this::loadAgents);
     }

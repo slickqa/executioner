@@ -5,6 +5,7 @@ import com.google.inject.multibindings.Multibinder;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.file.FileSystem;
+import io.vertx.core.http.HttpClient;
 import io.vertx.core.shareddata.SharedData;
 import org.reflections.Reflections;
 
@@ -30,6 +31,7 @@ public class ExecutionerGuiceModule extends AbstractModule {
         bind(EventBus.class).toInstance(vertx.eventBus());
         bind(SharedData.class).toInstance(vertx.sharedData());
         bind(FileSystem.class).toInstance(vertx.fileSystem());
+        bind(HttpClient.class).toInstance(vertx.createHttpClient());
         Set<Class> collectables = new HashSet<Class>();
         for(Class cls : reflections.getTypesAnnotatedWith(CollectableComponentType.class)) {
             if(cls.isInterface()) {

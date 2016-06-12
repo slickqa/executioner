@@ -15,6 +15,7 @@
         <module>executioner-executable</module>
         <module>executioner-dummyagent</module>
         <module>executioner-commandline-agent</module>
+        <module>executioner-slickv4-connector</module>
     </modules>
 
     <properties>
