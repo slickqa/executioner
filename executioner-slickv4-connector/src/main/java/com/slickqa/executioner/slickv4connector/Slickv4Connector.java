@@ -111,8 +111,8 @@ public class Slickv4Connector implements OnStartup {
                                     JsonArray requirements = new JsonArray();
                                     // add requirement for project-release
                                     if(result.containsKey("project") && result.containsKey("release")) {
-                                        requirements.add(result.getJsonObject("project").getString("name") + "-" +
-                                                         result.getJsonObject("release").getString("name"));
+                                        requirements.add(result.getJsonObject("project").getString("name").toLowerCase() + "-" +
+                                                         result.getJsonObject("release").getString("name").toLowerCase());
                                     }
                                     // add any requirements in the result's attributes
                                     if(result.containsKey("attributes")) {

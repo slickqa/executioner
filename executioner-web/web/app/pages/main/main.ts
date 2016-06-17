@@ -70,6 +70,9 @@ export class MainPage {
       //  that.projects = message.body;
       //});
     };
+    this.eb.onclose = function() {
+      console.log("Event Bus Closed.");
+    };
     window.currentPage = this;
   }
 }
