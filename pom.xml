@@ -7,7 +7,7 @@
     <groupId>com.slickqa</groupId>
     <artifactId>executioner</artifactId>
     <packaging>pom</packaging>
-    <version>2.0-SNAPSHOT</version>
+    <version>2.0.0-1</version>
     <description>Service used to distribute tasks to a variety of agents based on requirements.</description>
     <url>http://github.com/slickqa/executioner</url>
 
