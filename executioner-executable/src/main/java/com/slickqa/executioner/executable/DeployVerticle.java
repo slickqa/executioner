@@ -61,6 +61,25 @@ public class DeployVerticle extends AbstractVerticle {
                 agent = new DummyAgentVerticle();
             } else if("CommandLineAgent".equalsIgnoreCase(type)) {
                 agent = new CommandLineAgentVerticle();
+            } else if(config.getString("className") != null) {
+                try {
+                    Class agentClass = Class.forName(config.getString("className"));
+                    if(!Verticle.class.isAssignableFrom(agentClass)) {
+                        log.error("Class {0} for agent {1} is not a Verticle! Config: {2}",
+                                  config.getString("className"), name, config.encodePrettily());
+                        return false;
+                    }
+                    agent = (Verticle) agentClass.newInstance();
+
+                } catch (ClassNotFoundException e) {
+                    log.error("Problem when trying to deploy an agent with class " +
+                              config.getString("className") + " from config: " + config.encodePrettily(), e);
+                    return false;
+                } catch (InstantiationException | IllegalAccessException e) {
+                    log.error("Problem when trying to instantiate agent " + name + "'s class " +
+                              config.getString("className") + ": ", e);
+                    e.printStackTrace();
+                }
             }
             if(agent != null) {
                 vertx.deployVerticle(agent, options);
