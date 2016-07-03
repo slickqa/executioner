@@ -3,7 +3,7 @@ import {Page} from 'ionic-angular';
 declare var EventBus: any;
 
 // Array Remove - By John Resig (MIT Licensed)
-Array.prototype.remove = function(from, to) {
+var removeFromArray = function(from, to) {
   var rest = this.slice((to || from) + 1 || this.length);
   this.length = from < 0 ? this.length + from : from;
   return this.push.apply(this, rest);
@@ -62,7 +62,7 @@ export class MainPage {
       that.eb.registerHandler('executioner.agent.delete', function(error, message) {
         let index = that.agentNames.indexOf(message.body.name);
         if(index > -1) {
-          that.agentNames.remove(index);
+          removeFromArray.apply(that.agentNames, [index]);
         }
       });
       
@@ -73,6 +73,5 @@ export class MainPage {
     this.eb.onclose = function() {
       console.log("Event Bus Closed.");
     };
-    window.currentPage = this;
   }
 }
