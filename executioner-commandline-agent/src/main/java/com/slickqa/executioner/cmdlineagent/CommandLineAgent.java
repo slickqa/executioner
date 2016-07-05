@@ -25,18 +25,18 @@ import java.util.concurrent.ThreadLocalRandom;
 @AutoloadComponent
 public class CommandLineAgent implements OnStartup {
 
-    private EventBus eventBus;
-    private CommandLineAgentConfiguration config;
-    private Vertx vertx;
-    private FileSystem fs;
-    private JsonObject agent;
-    private String imageAddress;
-    private boolean requestedWork;
-    private boolean timeToStop;
-    private boolean readingFile;
-    private Logger log;
-    private JsonObject currentWork;
-    private Long imageLastModified;
+    protected EventBus eventBus;
+    protected CommandLineAgentConfiguration config;
+    protected Vertx vertx;
+    protected FileSystem fs;
+    protected JsonObject agent;
+    protected String imageAddress;
+    protected boolean requestedWork;
+    protected boolean timeToStop;
+    protected boolean readingFile;
+    protected Logger log;
+    protected JsonObject currentWork;
+    protected Long imageLastModified;
 
     @Inject
     public CommandLineAgent(EventBus eventBus, CommandLineAgentConfiguration config, Vertx vertx, FileSystem fs) {

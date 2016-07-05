@@ -7,6 +7,7 @@
       <ion-card-header>{{agentName}}</ion-card-header>
       <ion-card-content>
         <p><img [src]="agentImages[agentName]" /></p>
+        <p><strong>Provides: </strong><span *ngFor="let provide of agents[agentName].provides; let l=last">{{provide}}<span *ngIf="!l">, </span></span></p>
         <p *ngIf="agents[agentName].assignment && agents[agentName].assignment.name">{{agents[agentName].assignment.name}}</p>
       </ion-card-content>
     </ion-card>
