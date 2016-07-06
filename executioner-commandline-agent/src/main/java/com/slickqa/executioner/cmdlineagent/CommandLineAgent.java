@@ -49,7 +49,8 @@ public class CommandLineAgent implements OnStartup {
                 .put("name", config.getAgentName())
                 .put("provides", config.getProvides())
                 .put("deploymentId", vertx.getOrCreateContext().deploymentID())
-                .put("imageAddress", imageAddress);
+                .put("imageAddress", imageAddress)
+                .put("paused", false);
         this.requestedWork = false;
         this.timeToStop = false;
         this.log = LoggerFactory.getLogger(this.getClass().getName() + "." + config.getAgentName());
@@ -82,6 +83,19 @@ public class CommandLineAgent implements OnStartup {
             if(currentWork == null)
                 askForWork();
         });
+
+        eventBus.consumer(Addresses.AgentPauseBaseAddress + config.getAgentName()).handler(message -> {
+            agent.put("paused", true);
+            message.reply(agentUpdateObject());
+            broadcastInfo();
+        });
+
+        eventBus.consumer(Addresses.AgentResumeBaseAddress + config.getAgentName()).handler(message -> {
+            agent.put("paused", false);
+            message.reply(agentUpdateObject());
+            broadcastInfo();
+        });
+
         // try to avoid every agent polling at the exact same time
         vertx.setPeriodic(ThreadLocalRandom.current().nextInt(600, 800), this::checkForImageUpdate);
         broadcastInfo();
@@ -137,7 +151,7 @@ public class CommandLineAgent implements OnStartup {
                 log.info("Agent {0} requested to stop!", config.getAgentName());
                 eventBus.publish(Addresses.AgentDeleteAnnounce, agentUpdateObject());
                 requestedWork = true; // this will keep us from ever requesting work again and ensure we only send stop once
-            } else {
+            } else if(!agent.getBoolean("paused")) {
                 log.info("Asking for work for agent {0}", config.getAgentName());
 
                 // avoid requesting work more than once before we get the first response

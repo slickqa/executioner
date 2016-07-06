@@ -41,7 +41,8 @@ public class DummyAgent implements OnStartup {
         this.vertx = vertx;
         this.agent = new JsonObject()
                 .put("provides", new JsonArray().add("dummyagent").add("dummyagent-" + config.getDummyAgentNumber()))
-                .put("name", "dummyagent-" + config.getDummyAgentNumber());
+                .put("name", "dummyagent-" + config.getDummyAgentNumber())
+                .put("paused", false);
         this.currentWork = null;
         this.log = LoggerFactory.getLogger(DummyAgent.class.getName() + "." + "dummyagent-" + config.getDummyAgentNumber());
         this.imageAddress = Addresses.AgentImageBaseAddress + "dummyagent-" + config.getDummyAgentNumber();
@@ -65,6 +66,19 @@ public class DummyAgent implements OnStartup {
             }
         });
         eventBus.consumer(Addresses.AgentStopBaseAddress + agent.getString("name")).handler(message -> { timeToStop = true; message.reply(agentUpdateObject()); if(currentWork == null) askForWork();});
+
+        eventBus.consumer(Addresses.AgentPauseBaseAddress + agent.getString("name")).handler(message -> {
+            agent.put("paused", true);
+            message.reply(agentUpdateObject());
+            broadcastInfo();
+        });
+
+        eventBus.consumer(Addresses.AgentResumeBaseAddress + agent.getString("name")).handler(message -> {
+            agent.put("paused", false);
+            message.reply(agentUpdateObject());
+            broadcastInfo();
+        });
+
         broadcastInfo();
     }
 
@@ -88,7 +102,7 @@ public class DummyAgent implements OnStartup {
                 log.info("Dummy Agent {0} requested to stop!", agent.getString("name"));
                 eventBus.publish(Addresses.AgentDeleteAnnounce, agentUpdateObject());
                 requestedWork = true; // this will keep us from ever requesting work again and ensure we only send stop once
-            } else {
+            } else if(!agent.getBoolean("paused")) {
                 log.info("Asking for work for dummyagent-{0}", config.getDummyAgentNumber());
 
                 // avoid requesting work more than once before we get the first response

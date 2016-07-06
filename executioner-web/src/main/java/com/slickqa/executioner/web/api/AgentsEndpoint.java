@@ -55,6 +55,46 @@ public class AgentsEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
         // query all agents
         eventBus.send(Addresses.AgentQuery, null);
         router.route(HttpMethod.DELETE, config.getWebBasePath() + "api/agents/:agentName").handler(this::removeAgent);
+        router.route(HttpMethod.GET, config.getWebBasePath() + "api/agents/:agentName/pause").handler(this::pauseAgent);
+        router.route(HttpMethod.GET, config.getWebBasePath() + "api/agents/:agentName/resume").handler(this::resumeAgent);
+    }
+
+    public void pauseAgent(RoutingContext ctx) {
+        String agentName = ctx.request().getParam("agentName");
+        if(agents.containsKey(agentName)) {
+            eventBus.send(Addresses.AgentPauseBaseAddress + ctx.request().getParam("agentName"), null, response -> {
+                ctx.response()
+                        .setStatusCode(200)
+                        .putHeader("Content-Type", "application/json")
+                        .end(Json.encodePrettily(response.result().body()));
+            });
+        } else {
+            ctx.response()
+                    .setStatusCode(404)
+                    .putHeader("Content-Type", "application/json")
+                    .end(new JsonObject()
+                            .put("error", "Agent with name [" + agentName + "] not found.")
+                            .encodePrettily());
+        }
+    }
+
+    public void resumeAgent(RoutingContext ctx) {
+        String agentName = ctx.request().getParam("agentName");
+        if(agents.containsKey(agentName)) {
+            eventBus.send(Addresses.AgentResumeBaseAddress + ctx.request().getParam("agentName"), null, response -> {
+                ctx.response()
+                        .setStatusCode(200)
+                        .putHeader("Content-Type", "application/json")
+                        .end(Json.encodePrettily(response.result().body()));
+            });
+        } else {
+            ctx.response()
+                    .setStatusCode(404)
+                    .putHeader("Content-Type", "application/json")
+                    .end(new JsonObject()
+                            .put("error", "Agent with name [" + agentName + "] not found.")
+                            .encodePrettily());
+        }
     }
 
     public void removeAgent(RoutingContext ctx) {
@@ -134,6 +174,8 @@ public class AgentsEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
     public void addToSocksJSBridgeOptions(BridgeOptions options) {
         options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.AgentUpdate));
         options.addInboundPermitted(new PermittedOptions().setAddress(Addresses.AgentQuery));
+        options.addInboundPermitted(new PermittedOptions().setAddressRegex(Addresses.AgentPauseBaseAddress + ".*"));
+        options.addInboundPermitted(new PermittedOptions().setAddressRegex(Addresses.AgentResumeBaseAddress + ".*"));
         options.addOutboundPermitted(new PermittedOptions().setAddress(AddressForAgentImageUpdate));
         options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.AgentDeleteAnnounce));
     }

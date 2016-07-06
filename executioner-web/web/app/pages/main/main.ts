@@ -74,4 +74,13 @@ export class MainPage {
       console.log("Event Bus Closed.");
     };
   }
+
+  togglePaused(agentName: string) {
+    let that = this;
+    if(that.agents[agentName].paused) {
+      that.eb.send('executioner.agent.resume.' + agentName, {});
+    } else {
+      that.eb.send('executioner.agent.pause.' + agentName, {});
+    }
+  }
 }

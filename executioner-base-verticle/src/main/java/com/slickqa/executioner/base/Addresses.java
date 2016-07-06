@@ -14,6 +14,8 @@ public class Addresses {
     public static final String AgentUpdate = "executioner.agent.update";
     public static final String AgentDeleteAnnounce = "executioner.agent.delete";
     public static final String AgentStopBaseAddress = "executioner.agent.stop.";
+    public static final String AgentPauseBaseAddress = "executioner.agent.pause.";
+    public static final String AgentResumeBaseAddress = "executioner.agent.resume.";
     public static final String AgentBaseAddress = "executioner.agent.";
     public static final String AgentImageBaseAddress = "executioner.agent.image.";
 }
