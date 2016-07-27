@@ -29,16 +29,16 @@ public class Slickv4ConfigurationImpl implements Slickv4Configuration {
 
     @Override
     public int getPollingInterval() {
-        return config.getInteger("pollEvery", 20);
+        return config.getInteger("pollEvery", 10);
     }
 
     @Override
     public int getQueueSizeLowerBound() {
-        return config.getInteger("pollWhenQueueSizeLessThan", 15);
+        return config.getInteger("pollWhenQueueSizeLessThan", 1000);
     }
 
     @Override
     public int getSimultaneousFetchLimit() {
-        return config.getInteger("slickFetchLimit", 10);
+        return config.getInteger("slickFetchLimit", 50);
     }
 }
