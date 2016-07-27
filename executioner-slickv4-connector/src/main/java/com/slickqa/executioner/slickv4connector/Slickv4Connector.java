@@ -16,7 +16,6 @@ import io.vertx.core.logging.LoggerFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -30,8 +29,8 @@ public class Slickv4Connector implements OnStartup {
     private EventBus eventBus;
     private Slickv4Configuration config;
     private HttpClient httpClient;
-    private Set<String> workQueueResultIds;
-    private String pollingUrl;
+    private String newTestsUrl;
+    private String alreadyScheduledTestsUrl;
     private boolean polling;
     private int workQueueCount = 0;
     private Logger log;
@@ -55,14 +54,39 @@ public class Slickv4Connector implements OnStartup {
         }
         slickClientOptions.setSsl("https".equals(slickUrl.getProtocol()));
         this.httpClient = vertx.createHttpClient(slickClientOptions);
-        this.pollingUrl = slickUrl.getPath() + "/api/results/scheduledfor/" + config.getProjectName() + "/" + config.getExecutionerAgentName() + "?limit=" + config.getSimultaneousFetchLimit();
-        workQueueResultIds = new HashSet<>();
+        this.newTestsUrl = slickUrl.getPath() + "/api/results/schedulemorefor/" + config.getProjectName() + "/" + config.getExecutionerAgentName() + "?limit=" + config.getSimultaneousFetchLimit();
+        this.alreadyScheduledTestsUrl = slickUrl.getPath() + "/api/results/scheduledfor/" + config.getProjectName() + "/" + config.getExecutionerAgentName() + "?limit=" + config.getSimultaneousFetchLimit();
         polling = false;
         workQueueCount = 0;
     }
 
     @Override
     public void onStartup() {
+        // Grab existing scheduled tests
+        httpClient.getNow(alreadyScheduledTestsUrl, httpClientResponse -> {
+            if(httpClientResponse.statusCode() == 200) {
+                httpClientResponse.bodyHandler(buffer -> {
+                    JsonArray response = new JsonArray(buffer.toString());
+                    JsonArray addToWorkQueue = new JsonArray();
+                    // create work queue items out of response, send them to the work queue
+                    for(Object item: response) {
+                        if(item instanceof JsonObject) {
+                            addToWorkQueue.add(slickResultToWorkQueueItem((JsonObject)item));
+                        } else {
+                            log.error("What did slick return in the json array, expecting Json Object, got ({0})", item.getClass().getName());
+                        }
+                    }
+                    if(addToWorkQueue.size() > 0) {
+                        log.info("Sending {0} existing slick items to add to the work queue.", addToWorkQueue.size());
+                        eventBus.send(Addresses.WorkQueueAdd, addToWorkQueue);
+                    }
+                });
+            } else {
+                httpClientResponse.bodyHandler(buffer -> {
+                    log.warn("Requesting existing scheduled results from slick return status code {0}: {1}", httpClientResponse.statusCode(), buffer);
+                });
+            }
+        });
         eventBus.consumer(Addresses.WorkQueueInfo).handler(this::onWorkQueueUpdate);
         eventBus.send(Addresses.WorkQueueQuery, null);
         vertx.setPeriodic(config.getPollingInterval() * 1000, this::pollForWorkIfNeeded);
@@ -73,16 +97,36 @@ public class Slickv4Connector implements OnStartup {
         if(body instanceof JsonArray) {
             JsonArray workQueue = (JsonArray) body;
             workQueueCount = workQueue.size();
-            workQueueResultIds = new HashSet<>();
-            for(Object item : workQueue) {
-                if(item instanceof JsonObject) {
-                    JsonObject workItem = (JsonObject) item;
-                    if(workItem.containsKey("slickResult") && workItem.getJsonObject("slickResult").containsKey("id")) {
-                        workQueueResultIds.add(workItem.getJsonObject("slickResult").getString("id"));
-                    }
+        }
+    }
+
+    protected JsonObject slickResultToWorkQueueItem(JsonObject result) {
+        String resultId = result.getString("id");
+        JsonObject workQueueItem = new JsonObject()
+                .put("name", result.getJsonObject("testcase").getString("name"))
+                .put("slickResult", result);
+        JsonArray requirements = new JsonArray();
+        // add requirement for project-release
+        if(result.containsKey("project") && result.containsKey("release") && result.containsKey("build")) {
+            requirements.add(result.getJsonObject("project").getString("name").toLowerCase() + "-" +
+                    result.getJsonObject("release").getString("name").toLowerCase() + "-" +
+                    result.getJsonObject("build").getString("name").toLowerCase());
+        }
+        // add any requirements in the result's attributes
+        if(result.containsKey("attributes")) {
+            JsonObject attributes = result.getJsonObject("attributes");
+            for(String attrName : attributes.fieldNames()) {
+                if("required".equals(attributes.getString(attrName))) {
+                    requirements.add(attrName);
                 }
             }
         }
+        // add the Automation Tool as a requirement
+        if(result.getJsonObject("testcase").containsKey("automationTool")) {
+            requirements.add(result.getJsonObject("testcase").getString("automationTool"));
+        }
+        workQueueItem.put("requirements", requirements);
+        return workQueueItem;
     }
 
     public void pollForWorkIfNeeded(Long id) {
@@ -92,8 +136,8 @@ public class Slickv4Connector implements OnStartup {
         }
         if(workQueueCount < config.getQueueSizeLowerBound()) {
             polling = true;
-            log.info("Polling slick url {0}.", pollingUrl);
-            httpClient.getNow(pollingUrl, httpClientResponse -> {
+            log.info("Polling slick url {0}.", newTestsUrl);
+            httpClient.getNow(newTestsUrl, httpClientResponse -> {
                 if(httpClientResponse.statusCode() == 200) {
                     httpClientResponse.bodyHandler(buffer -> {
                         JsonArray response = new JsonArray(buffer.toString());
@@ -102,35 +146,7 @@ public class Slickv4Connector implements OnStartup {
                         // create work queue items out of response, send them to the work queue
                         for(Object item: response) {
                             if(item instanceof JsonObject) {
-                                JsonObject result = (JsonObject) item;
-                                String resultId = result.getString("id");
-                                if(!workQueueResultIds.contains(resultId)) {
-                                    JsonObject workQueueItem = new JsonObject()
-                                            .put("name", result.getJsonObject("testcase").getString("name"))
-                                            .put("slickResult", result);
-                                    JsonArray requirements = new JsonArray();
-                                    // add requirement for project-release
-                                    if(result.containsKey("project") && result.containsKey("release") && result.containsKey("build")) {
-                                        requirements.add(result.getJsonObject("project").getString("name").toLowerCase() + "-" +
-                                                         result.getJsonObject("release").getString("name").toLowerCase() + "-" +
-                                                         result.getJsonObject("build").getString("name").toLowerCase());
-                                    }
-                                    // add any requirements in the result's attributes
-                                    if(result.containsKey("attributes")) {
-                                        JsonObject attributes = result.getJsonObject("attributes");
-                                        for(String attrName : attributes.fieldNames()) {
-                                            if("required".equals(attributes.getString(attrName))) {
-                                                requirements.add(attrName);
-                                            }
-                                        }
-                                    }
-                                    // add the Automation Tool as a requirement
-                                    if(result.getJsonObject("testcase").containsKey("automationTool")) {
-                                        requirements.add(result.getJsonObject("testcase").getString("automationTool"));
-                                    }
-                                    workQueueItem.put("requirements", requirements);
-                                    addToWorkQueue.add(workQueueItem);
-                                }
+                                addToWorkQueue.add(slickResultToWorkQueueItem((JsonObject)item));
                             } else {
                                 log.error("What did slick return in the json array, expecting Json Object, got ({0})", item.getClass().getName());
                             }
