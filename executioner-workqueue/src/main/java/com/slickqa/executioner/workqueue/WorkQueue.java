@@ -1,6 +1,7 @@
 package com.slickqa.executioner.workqueue;
 
 import com.google.inject.Inject;
+import com.slickqa.executioner.base.Addresses;
 import com.slickqa.executioner.base.AutoloadComponent;
 import com.slickqa.executioner.base.OnStartup;
 import io.vertx.core.Vertx;
@@ -57,7 +58,7 @@ public class WorkQueue implements OnStartup {
         eventBus.consumer(WorkQueueAdd).handler(this::addToWorkQueueHandler);
         eventBus.consumer(WorkQueueQuery).handler(message -> message.reply(workQueueMessage()));
         eventBus.consumer(WorkQueueRequestWork).handler(this::requestWorkHandler);
-        eventBus.consumer(WorkStop).handler(message -> { this.stopped = true; message.reply(new JsonObject().put("stopped", stopped));});
+        eventBus.consumer(WorkStop).handler(message -> { this.stopped = true; message.reply(new JsonObject().put("stopped", stopped)); eventBus.publish(Addresses.WorkQueueState, workQueueState()); });
         eventBus.consumer(WorkStart).handler(message -> { this.stopped = false; message.reply(new JsonObject().put("stopped", stopped)); publishQueueInfo();});
     }
 
@@ -69,6 +70,12 @@ public class WorkQueue implements OnStartup {
         return retval;
     }
 
+    private JsonObject workQueueState() {
+        JsonObject retval = new JsonObject()
+            .put("stopped", stopped);
+        return retval;
+    }
+
     private void resetBroadcastAfter() {
         broadcastAfter = LocalDateTime.now().plusSeconds(config.getWorkQueueBroadcastInterval());
     }
@@ -76,6 +83,7 @@ public class WorkQueue implements OnStartup {
     public void publishQueueInfo() {
         log.info("Publishing Work Queue.");
         eventBus.publish(WorkQueueInfo, workQueueMessage());
+        eventBus.publish(Addresses.WorkQueueState, workQueueState());
         resetBroadcastAfter();
     }
 

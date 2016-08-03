@@ -32,6 +32,8 @@ public class Slickv4Connector implements OnStartup {
     private String newTestsUrl;
     private String alreadyScheduledTestsUrl;
     private boolean polling;
+    private int pollingSkippedCount;
+    private int pollingSkippedThreshold;
     private int workQueueCount = 0;
     private Logger log;
 
@@ -58,11 +60,14 @@ public class Slickv4Connector implements OnStartup {
         this.alreadyScheduledTestsUrl = slickUrl.getPath() + "/api/results/scheduledfor/" + config.getProjectName() + "/" + config.getExecutionerAgentName() + "?limit=" + config.getSimultaneousFetchLimit();
         polling = false;
         workQueueCount = 0;
+        pollingSkippedCount = 0;
+        pollingSkippedThreshold = 24;
     }
 
     @Override
     public void onStartup() {
         // Grab existing scheduled tests
+        eventBus.publish(Addresses.ExternalRequest, new JsonObject().put(alreadyScheduledTestsUrl, true));
         httpClient.getNow(alreadyScheduledTestsUrl, httpClientResponse -> {
             if(httpClientResponse.statusCode() == 200) {
                 httpClientResponse.bodyHandler(buffer -> {
@@ -80,11 +85,13 @@ public class Slickv4Connector implements OnStartup {
                         log.info("Sending {0} existing slick items to add to the work queue.", addToWorkQueue.size());
                         eventBus.send(Addresses.WorkQueueAdd, addToWorkQueue);
                     }
+                    eventBus.publish(Addresses.ExternalRequest, new JsonObject().put(alreadyScheduledTestsUrl, false));
                 });
             } else {
                 httpClientResponse.bodyHandler(buffer -> {
                     log.warn("Requesting existing scheduled results from slick return status code {0}: {1}", httpClientResponse.statusCode(), buffer);
                 });
+                eventBus.publish(Addresses.ExternalRequest, new JsonObject().put(alreadyScheduledTestsUrl, false));
             }
         });
         eventBus.consumer(Addresses.WorkQueueInfo).handler(this::onWorkQueueUpdate);
@@ -130,13 +137,17 @@ public class Slickv4Connector implements OnStartup {
     }
 
     public void pollForWorkIfNeeded(Long id) {
-        if(polling) {
+        if(polling && pollingSkippedCount < pollingSkippedThreshold) {
             log.warn("Call for polling when we are already polling!");
+            eventBus.publish(Addresses.ExternalRequest, new JsonObject().put(newTestsUrl, true));
+            pollingSkippedCount++;
             return;
         }
         if(workQueueCount < config.getQueueSizeLowerBound()) {
+            pollingSkippedCount = 0;
             polling = true;
             log.info("Polling slick url {0}.", newTestsUrl);
+            eventBus.publish(Addresses.ExternalRequest, new JsonObject().put(newTestsUrl, true));
             httpClient.getNow(newTestsUrl, httpClientResponse -> {
                 if(httpClientResponse.statusCode() == 200) {
                     httpClientResponse.bodyHandler(buffer -> {
@@ -158,12 +169,14 @@ public class Slickv4Connector implements OnStartup {
                             log.info("No new work from Slick");
                         }
                         polling = false;
+                        eventBus.publish(Addresses.ExternalRequest, new JsonObject().put(newTestsUrl, false));
                     });
                 } else {
                     httpClientResponse.bodyHandler(buffer -> {
                         log.warn("Polling return status code {0}: {1}", httpClientResponse.statusCode(), buffer);
-                        polling = false;
                     });
+                    polling = false;
+                    eventBus.publish(Addresses.ExternalRequest, new JsonObject().put(newTestsUrl, false));
                 }
             });
         } else {

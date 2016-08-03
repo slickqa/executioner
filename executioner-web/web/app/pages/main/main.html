@@ -1,22 +1,32 @@
 <ion-navbar *navbar>
-  <ion-title>Executioner Status (Queue Size: {{workqueue.length}})</ion-title>
+  <ion-title>Executioner Status (<span *ngIf="workqueueState.stopped">Stopped </span>Queue Size: {{workqueue.length}}) <span *ngIf="externalRequestInProgress">(External Request In Progress)</span></ion-title>
+  <ion-buttons end>
+    <button class="button-primary" large [outline]="live ? null : true">{{ live ? "Live" : "Disconnected"}}</button>
+  </ion-buttons>
 </ion-navbar>
 <ion-content>
   <ion-row class="agent-row" responsive-sm>
     <ion-card class="agent" *ngFor="let agentName of agentNames;">
       <ion-card-header class="agent-header">
         <ion-toolbar primary>
-          <ion-title>{{agentName}}</ion-title>
+          <ion-title>{{agentName}} <span *ngIf="agents[agentName].requestedWork">(Asking)</span> <span *ngIf="agents[agentName].agentUndeployRequested">(Stopping)</span> </ion-title>
           <ion-buttons end><button round (click)="togglePaused(agentName)"><ion-icon *ngIf="agents[agentName].paused" name="play"></ion-icon><ion-icon *ngIf="!agents[agentName].paused" name="pause"></ion-icon></button></ion-buttons>
         </ion-toolbar>
       </ion-card-header>
       <ion-card-content>
-        <p><img [src]="agentImages[agentName]" /></p>
-        <p>
+        <div><img [src]="agentImages[agentName]" /></div>
+        <div *ngIf="isNotEmpty(agents[agentName].information)">
+          <strong>Information:</strong>
+          <ul>
+            <li *ngFor="let key of keys(agents[agentName].information)"><strong>{{key}}:</strong> {{agents[agentName].information[key]}}</li>
+          </ul>
+        </div>
+        <div>
           <strong>Provides: </strong>
           <ul>
             <li *ngFor="let provide of agents[agentName].provides; let l=last">{{provide}}</li>
           </ul>
+        </div>
         <p *ngIf="agents[agentName].assignment && agents[agentName].assignment.name">{{agents[agentName].assignment.name}}</p>
       </ion-card-content>
     </ion-card>

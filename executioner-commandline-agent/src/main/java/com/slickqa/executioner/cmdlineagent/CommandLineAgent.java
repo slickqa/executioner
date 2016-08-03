@@ -48,6 +48,7 @@ public class CommandLineAgent implements OnStartup {
         this.agent = new JsonObject()
                 .put("name", config.getAgentName())
                 .put("provides", config.getProvides())
+                .put("information", config.getAgentInformation())
                 .put("deploymentId", vertx.getOrCreateContext().deploymentID())
                 .put("imageAddress", imageAddress)
                 .put("paused", false);
@@ -132,7 +133,9 @@ public class CommandLineAgent implements OnStartup {
 
     protected JsonObject agentUpdateObject() {
         JsonObject current = agent.copy()
-                .put("agentUndeployRequested", timeToStop);
+                .put("agentUndeployRequested", timeToStop)
+                .put("requestedWork", requestedWork)
+                .put("readingFile", readingFile);
         if(currentWork != null) {
             current = current.put("assignment", currentWork);
         }
@@ -151,20 +154,24 @@ public class CommandLineAgent implements OnStartup {
                 log.info("Agent {0} requested to stop!", config.getAgentName());
                 eventBus.publish(Addresses.AgentDeleteAnnounce, agentUpdateObject());
                 requestedWork = true; // this will keep us from ever requesting work again and ensure we only send stop once
+                broadcastInfo();
             } else if(!agent.getBoolean("paused")) {
                 log.info("Asking for work for agent {0}", config.getAgentName());
 
                 // avoid requesting work more than once before we get the first response
                 requestedWork = true;
+                broadcastInfo();
                 eventBus.send(Addresses.WorkQueueRequestWork, agent, response -> {
                     if (response.succeeded() && response.result().body() instanceof JsonObject) {
                         log.info("Recieved work for agent {0} from WorkQueue: {1}", config.getAgentName(), Json.encodePrettily(response.result().body()));
                         currentWork = (JsonObject) response.result().body();
                         requestedWork = false;
                         startWork();
+                        broadcastInfo();
                     } else {
                         requestedWork = false;
                         log.info("No work for {0} because: {1}", config.getAgentName(), response.cause().getMessage());
+                        broadcastInfo();
                     }
                 });
             }

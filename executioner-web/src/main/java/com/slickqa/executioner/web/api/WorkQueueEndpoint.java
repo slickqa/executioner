@@ -72,6 +72,7 @@ public class WorkQueueEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
     public void addToSocksJSBridgeOptions(BridgeOptions options) {
         options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueInfo));
         options.addInboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueQuery));
+        options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueState));
     }
 
     public void stopWorkQueue(RoutingContext ctx) {

@@ -24,6 +24,11 @@ public class CommandLineAgentConfigurationImpl implements CommandLineAgentConfig
     }
 
     @Override
+    public JsonObject getAgentInformation() {
+        return config.getJsonObject("information", new JsonObject());
+    }
+
+    @Override
     public String getImageWatchPath() {
         return config.getString("imagePath", "/tmp/screen.png");
     }

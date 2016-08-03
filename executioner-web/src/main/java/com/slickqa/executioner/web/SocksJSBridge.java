@@ -1,6 +1,7 @@
 package com.slickqa.executioner.web;
 
 import com.google.inject.Inject;
+import com.slickqa.executioner.base.Addresses;
 import com.slickqa.executioner.base.AutoloadComponent;
 import com.slickqa.executioner.base.OnStartup;
 import io.vertx.core.Vertx;
@@ -8,6 +9,7 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.sockjs.BridgeEventType;
 import io.vertx.ext.web.handler.sockjs.BridgeOptions;
+import io.vertx.ext.web.handler.sockjs.PermittedOptions;
 import io.vertx.ext.web.handler.sockjs.SockJSHandler;
 
 import java.util.Set;
@@ -47,6 +49,7 @@ public class SocksJSBridge implements OnStartup {
         for(AddsSocksJSBridgeOptions bridgeOptionComponent : bridgeOptionComponents) {
             bridgeOptionComponent.addToSocksJSBridgeOptions(options);
         }
+        options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.ExternalRequest));
 
         // publish on the event bus any registration from socksjs clients
         sockJSHandler.bridge(options, be -> {

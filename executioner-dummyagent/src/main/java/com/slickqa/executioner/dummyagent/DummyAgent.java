@@ -42,7 +42,8 @@ public class DummyAgent implements OnStartup {
         this.agent = new JsonObject()
                 .put("provides", new JsonArray().add("dummyagent").add("dummyagent-" + config.getDummyAgentNumber()))
                 .put("name", "dummyagent-" + config.getDummyAgentNumber())
-                .put("paused", false);
+                .put("paused", false)
+                .put("information", new JsonObject().put("something", "here"));
         this.currentWork = null;
         this.log = LoggerFactory.getLogger(DummyAgent.class.getName() + "." + "dummyagent-" + config.getDummyAgentNumber());
         this.imageAddress = Addresses.AgentImageBaseAddress + "dummyagent-" + config.getDummyAgentNumber();
@@ -65,7 +66,7 @@ public class DummyAgent implements OnStartup {
                 }
             }
         });
-        eventBus.consumer(Addresses.AgentStopBaseAddress + agent.getString("name")).handler(message -> { timeToStop = true; message.reply(agentUpdateObject()); if(currentWork == null) askForWork();});
+        eventBus.consumer(Addresses.AgentStopBaseAddress + agent.getString("name")).handler(message -> { timeToStop = true; message.reply(agentUpdateObject()); if(currentWork == null) askForWork(); broadcastInfo();});
 
         eventBus.consumer(Addresses.AgentPauseBaseAddress + agent.getString("name")).handler(message -> {
             agent.put("paused", true);
@@ -83,9 +84,11 @@ public class DummyAgent implements OnStartup {
     }
 
     protected JsonObject agentUpdateObject() {
-        JsonObject current = agent;
+        JsonObject current = agent.copy();
+        current.put("agentUndeployRequested", timeToStop)
+               .put("requestedWork", requestedWork);
         if(currentWork != null) {
-            current = agent.copy().put("assignment", currentWork).put("agentUndeployRequested", timeToStop);
+            current.put("assignment", currentWork).put("agentUndeployRequested", timeToStop);
         }
         return current;
     }
@@ -102,20 +105,24 @@ public class DummyAgent implements OnStartup {
                 log.info("Dummy Agent {0} requested to stop!", agent.getString("name"));
                 eventBus.publish(Addresses.AgentDeleteAnnounce, agentUpdateObject());
                 requestedWork = true; // this will keep us from ever requesting work again and ensure we only send stop once
+                broadcastInfo();
             } else if(!agent.getBoolean("paused")) {
                 log.info("Asking for work for dummyagent-{0}", config.getDummyAgentNumber());
 
                 // avoid requesting work more than once before we get the first response
                 requestedWork = true;
+                broadcastInfo();
                 eventBus.send(Addresses.WorkQueueRequestWork, agent, response -> {
                     if (response.succeeded() && response.result().body() instanceof JsonObject) {
                         log.info("Recieved work from WorkQueue: {0}", Json.encodePrettily(response.result().body()));
                         currentWork = (JsonObject) response.result().body();
                         requestedWork = false;
                         startWork();
+                        broadcastInfo();
                     } else {
                         requestedWork = false;
                         log.info("No work because: {0}", response.cause().getMessage());
+                        broadcastInfo();
                     }
                 });
             }
