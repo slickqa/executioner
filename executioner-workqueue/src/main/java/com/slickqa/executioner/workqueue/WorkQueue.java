@@ -33,7 +33,7 @@ public class WorkQueue implements OnStartup {
     private EventBus eventBus;
     private WorkQueueConfiguration config;
     private LocalDateTime broadcastAfter;
-    private List<WorkQueueItem> workQueue;
+    private WorkQueueList workQueue;
     private Logger log;
     private boolean stopped;
 
@@ -42,7 +42,7 @@ public class WorkQueue implements OnStartup {
         this.eventBus = eventBus;
         this.config = config;
         this.vertx = vertx;
-        this.workQueue = new ArrayList<>(config.getWorkQueueSize());
+        this.workQueue = new WorkQueueList();
         this.log = LoggerFactory.getLogger(WorkQueue.class);
         this.stopped = false;
     }
@@ -60,6 +60,7 @@ public class WorkQueue implements OnStartup {
         eventBus.consumer(WorkQueueRequestWork).handler(this::requestWorkHandler);
         eventBus.consumer(WorkStop).handler(message -> { this.stopped = true; message.reply(new JsonObject().put("stopped", stopped)); eventBus.publish(Addresses.WorkQueueState, workQueueState()); });
         eventBus.consumer(WorkStart).handler(message -> { this.stopped = false; message.reply(new JsonObject().put("stopped", stopped)); publishQueueInfo();});
+        eventBus.consumer(WorkQueueCancelItem, this::cancelWorkItem);
     }
 
     private JsonArray workQueueMessage() {
@@ -146,5 +147,23 @@ public class WorkQueue implements OnStartup {
                 }
             }
         }
+    }
+
+    public void cancelWorkItem(Message<JsonObject> message) {
+        log.info("request to remove item");
+        if(workQueue.size() == 0) {
+            message.fail(100, "WorkQueue is empty, cannot cancel");
+        }
+        JsonObject itemToRemove = message.body();
+        WorkQueueItem workItem = workQueue.remove(itemToRemove);
+        if(workItem != null) {
+            log.info("found item to remove");
+            message.reply(new JsonObject().put("success", true));
+            publishQueueInfo();
+            eventBus.publish(WorkQueueItemCancelled, workItem.toJsonObject());
+        } else {
+            message.fail(200, "Unable to find item in WorkQueue.");
+        }
+
     }
 }

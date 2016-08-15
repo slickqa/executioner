@@ -1,4 +1,4 @@
-import {Page} from 'ionic-angular';
+import {Page, NavParams, Modal, NavController, Nav, ViewController} from 'ionic-angular';
 
 declare var EventBus: any;
 
@@ -13,6 +13,7 @@ var removeFromArray = function(from, to) {
   templateUrl: 'build/pages/main/main.html'
 })
 export class MainPage {
+  nav: NavController;
   eb: any;
   img: string;
   public agents: any;
@@ -24,7 +25,8 @@ export class MainPage {
   public externalRequestInProgress: boolean;
   public live: boolean;
 
-  constructor() {
+  constructor(nav: NavController) {
+    this.nav = nav;
     var that = this;
     var location: string;
     this.live = false;
@@ -122,5 +124,37 @@ export class MainPage {
     let keys = Object.keys(obj);
     keys.sort();
     return keys;
+  }
+
+  openWorkQueue() {
+    let workQueueModal = Modal.create(WorkQueueModal, {'workqueue': this.workqueue, 'eb': this.eb});
+    this.nav.present(workQueueModal);
+  }
+}
+
+@Page({
+  templateUrl: 'build/pages/main/workqueue.html'
+})
+class WorkQueueModal {
+  public workQueueItems: Array<any>;
+  private viewController: ViewController;
+  eb: any;
+
+  constructor(params: NavParams, viewController: ViewController) {
+    this.workQueueItems = params.get('workqueue');
+    this.viewController = viewController;
+    this.eb = params.get('eb');
+    let that = this;
+    this.eb.registerHandler('executioner.workqueue.info', function(error, message) {
+      that.workQueueItems = message.body;
+    });
+  }
+
+  cancelItem(workItem: any) {
+    this.eb.send('executioner.workqueue.cancel', workItem);
+  }
+
+  close() {
+    this.viewController.dismiss();
   }
 }

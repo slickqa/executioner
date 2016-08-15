@@ -37,6 +37,20 @@ public class WorkQueueItem {
         }
     }
 
+    public boolean matches(JsonObject other) {
+        if(source.containsKey("id")) {
+            if(!other.containsKey("id")) {
+                return false;
+            }
+            return source.getString("id").equals(other.getString("id"));
+        } else {
+            if(other.containsKey("id")) {
+                return false;
+            }
+            return source.equals(other);
+        }
+    }
+
     public Set<String> getRequirements() {
         return requirements;
     }

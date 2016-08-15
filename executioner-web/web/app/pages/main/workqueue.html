@@ -1,0 +1,18 @@
+<ion-content>
+  <ion-toolbar primary>
+    <ion-title>Work Queue ({{workQueueItems.length}})</ion-title>
+    <ion-buttons end>
+      <button (click)="close()"><ion-icon name="close"></ion-icon></button>
+    </ion-buttons>
+  </ion-toolbar>
+  <ion-content>
+    <ion-list>
+      <ion-item *ngFor="let workItem of workQueueItems;">
+        <h2>{{workItem.name}}</h2>
+        <h3 *ngIf="workItem.groupName">{{workItem.groupName}}</h3>
+        <h3><span *ngFor="let requirement of workItem.requirements; let last = last;">{{requirement}}<span *ngIf="!last">, </span></span></h3>
+        <button class="cancel-workitem-button" item-right outline round (click)="cancelItem(workItem)"><ion-icon name="close"></ion-icon></button>
+      </ion-item>
+    </ion-list>
+  </ion-content>
+</ion-content>

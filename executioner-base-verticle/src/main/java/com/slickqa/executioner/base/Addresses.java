@@ -11,6 +11,8 @@ public class Addresses {
     public static final String WorkQueueQuery = "executioner.workqueue.query";
     public static final String WorkQueueRequestWork = "executioner.workqueue.requestAssignment";
     public static final String WorkQueueState = "executioner.workqueue.state";
+    public static final String WorkQueueCancelItem = "executioner.workqueue.cancel";
+    public static final String WorkQueueItemCancelled = "executioner.workqueue.itemCancelled";
     public static final String AgentQuery = "executioner.agent.queryall";
     public static final String AgentUpdate = "executioner.agent.update";
     public static final String AgentDeleteAnnounce = "executioner.agent.delete";

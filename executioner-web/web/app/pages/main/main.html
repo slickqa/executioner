@@ -1,6 +1,7 @@
 <ion-navbar *navbar>
   <ion-title>Executioner Status (<span *ngIf="workqueueState.stopped">Stopped </span>Queue Size: {{workqueue.length}}) <span *ngIf="externalRequestInProgress">(External Request In Progress)</span></ion-title>
   <ion-buttons end>
+    <button large outline (click)="openWorkQueue()">View Work Queue</button>
     <button class="button-primary" large [outline]="live ? null : true">{{ live ? "Live" : "Disconnected"}}</button>
   </ion-buttons>
 </ion-navbar>
