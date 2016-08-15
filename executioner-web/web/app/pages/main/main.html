@@ -28,7 +28,10 @@
             <li *ngFor="let provide of agents[agentName].provides; let l=last">{{provide}}</li>
           </ul>
         </div>
-        <p *ngIf="agents[agentName].assignment && agents[agentName].assignment.name">{{agents[agentName].assignment.name}}</p>
+        <p *ngIf="agents[agentName].assignment && agents[agentName].assignment.name">
+          <a class="plain-link" *ngIf="agents[agentname].assignment.url" href="{{agents[agentname].assignment.url}}" target="_blank">{{agents[agentName].assignment.name}}</a>
+          <span *ngIf="!agents[agentname].assignment.url">{{agents[agentName].assignment.name}}</span>
+        </p>
       </ion-card-content>
     </ion-card>
   </ion-row>

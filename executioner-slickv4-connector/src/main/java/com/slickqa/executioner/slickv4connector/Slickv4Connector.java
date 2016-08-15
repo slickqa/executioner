@@ -35,6 +35,7 @@ public class Slickv4Connector implements OnStartup {
     private int pollingSkippedCount;
     private int pollingSkippedThreshold;
     private int workQueueCount = 0;
+    private URL slickUrl;
     private Logger log;
 
 
@@ -44,7 +45,7 @@ public class Slickv4Connector implements OnStartup {
         this.vertx = vertx;
         this.eventBus = eventBus;
         this.config = config;
-        URL slickUrl = new URL(config.getSlickUrl());
+        slickUrl = new URL(config.getSlickUrl());
         HttpClientOptions slickClientOptions = new HttpClientOptions();
         slickClientOptions.setDefaultHost(slickUrl.getHost());
         if(slickUrl.getPort() != -1) {
@@ -95,6 +96,7 @@ public class Slickv4Connector implements OnStartup {
             }
         });
         eventBus.consumer(Addresses.WorkQueueInfo).handler(this::onWorkQueueUpdate);
+        eventBus.consumer(Addresses.WorkQueueItemCancelled, this::workItemCancelled);
         eventBus.send(Addresses.WorkQueueQuery, null);
         vertx.setPeriodic(config.getPollingInterval() * 1000, this::pollForWorkIfNeeded);
     }
@@ -111,6 +113,10 @@ public class Slickv4Connector implements OnStartup {
         String resultId = result.getString("id");
         JsonObject workQueueItem = new JsonObject()
                 .put("name", result.getJsonObject("testcase").getString("name"))
+                .put("id", result.getString("id"))
+                .put("url", config.getSlickUrl() + "/testruns/" + result.getJsonObject("testrun").getString("testrunId") + "?result=" + result.getString("id"))
+                .put("groupName", result.getJsonObject("testrun").getString("name"))
+                .put("groupUrl", config.getSlickUrl() + "/testruns/" + result.getJsonObject("testrun").getString("testrunId"))
                 .put("slickResult", result);
         JsonArray requirements = new JsonArray();
         // add requirement for project-release
@@ -133,7 +139,20 @@ public class Slickv4Connector implements OnStartup {
             requirements.add(result.getJsonObject("testcase").getString("automationTool"));
         }
         workQueueItem.put("requirements", requirements);
+
         return workQueueItem;
+    }
+
+    public void workItemCancelled(Message<JsonObject> message) {
+        JsonObject itemCancelled = message.body();
+        if(itemCancelled.containsKey("slickResult")) {
+            JsonObject update = new JsonObject()
+                    .put("status", "SKIPPED")
+                    .put("reason", "Cancelled from Executioner");
+            httpClient.put(slickUrl.getPath() + "/api/results/" + itemCancelled.getJsonObject("slickResult").getString("id"), response -> {})
+                    .putHeader("Content-Type", "application/json")
+                    .end(update.encode());
+        }
     }
 
     public void pollForWorkIfNeeded(Long id) {
