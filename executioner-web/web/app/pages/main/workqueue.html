@@ -1,13 +1,13 @@
 <ion-content>
   <ion-toolbar primary>
-    <ion-title>Work Queue ({{workQueueItems.length}})</ion-title>
+    <ion-title>Work Queue (1 - {{displayItems.length}} of {{workQueueItems.length}})</ion-title>
     <ion-buttons end>
       <button (click)="close()"><ion-icon name="close"></ion-icon></button>
     </ion-buttons>
   </ion-toolbar>
   <ion-content>
     <ion-list>
-      <ion-item *ngFor="let workItem of workQueueItems;">
+      <ion-item *ngFor="let workItem of displayItems;">
         <h2 *ngIf="!workItem.url">{{workItem.name}}</h2>
         <h2 *ngIf="workItem.url"><a class="plain-link" href="{{workItem.url}}" target="_blank">{{workItem.name}}</a></h2>
         <h3 *ngIf="workItem.groupName && workItem.groupUrl"><a class="plain-link" href="{{workItem.groupUrl}}" target="_blank">{{workItem.groupName}}</a></h3>
@@ -16,5 +16,11 @@
         <button class="cancel-workitem-button" item-right outline round (click)="cancelItem(workItem)"><ion-icon name="close"></ion-icon></button>
       </ion-item>
     </ion-list>
+    <ion-infinite-scroll (infinite)="doInfinite($event)" *ngIf="displayItems.length < workQueueItems.length">
+      <ion-infinite-scroll-content
+              loadingSpinner="bubbles"
+              loadingText="Loading more data...">
+      </ion-infinite-scroll-content>
+    </ion-infinite-scroll>
   </ion-content>
 </ion-content>

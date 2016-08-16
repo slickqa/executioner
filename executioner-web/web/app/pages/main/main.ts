@@ -139,19 +139,33 @@ class WorkQueueModal {
   public workQueueItems: Array<any>;
   private viewController: ViewController;
   eb: any;
+  public displayItems: Array<any>;
 
   constructor(params: NavParams, viewController: ViewController) {
     this.workQueueItems = params.get('workqueue');
+    this.displayItems = this.workQueueItems.slice(0, 100);
     this.viewController = viewController;
     this.eb = params.get('eb');
     let that = this;
     this.eb.registerHandler('executioner.workqueue.info', function(error, message) {
       that.workQueueItems = message.body;
+      that.displayItems = that.workQueueItems.slice(0, that.displayItems.length);
     });
   }
 
   cancelItem(workItem: any) {
     this.eb.send('executioner.workqueue.cancel', workItem);
+  }
+
+  doInfinite(infiniteScroll) {
+    console.log('Infinite scroll started');
+    if(this.displayItems.length < this.workQueueItems.length) {
+      console.log('Adding items to displayed items');
+      let lastIndex = this.displayItems.length;
+      this.displayItems.push.apply(this.displayItems, this.workQueueItems.slice(lastIndex, lastIndex + 100));
+    }
+    console.log('Infinite scroll complete');
+    infiniteScroll.complete();
   }
 
   close() {
