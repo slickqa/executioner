@@ -23,3 +23,7 @@ ion-card ion-card-header.agent-header {
 .plain-link {
   text-decoration: None;
 }
+
+.workflow-dialog > scroll-content {
+  overflow-y: hidden;
+}
