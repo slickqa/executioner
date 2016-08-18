@@ -2,6 +2,8 @@ import {Page, NavParams, Modal, NavController, Nav, ViewController} from 'ionic-
 
 declare var EventBus: any;
 
+declare var window: any;
+
 // Array Remove - By John Resig (MIT Licensed)
 var removeFromArray = function(from, to) {
   var rest = this.slice((to || from) + 1 || this.length);
@@ -26,6 +28,7 @@ export class MainPage {
   public live: boolean;
 
   constructor(nav: NavController) {
+    window.mainpage = this;
     this.nav = nav;
     var that = this;
     var location: string;
@@ -75,6 +78,13 @@ export class MainPage {
       that.eb.registerHandler('executioner.agent.update', function(error, message) {
         if(message.body.provides) {
           message.body.provides.sort();
+        }
+        if(!message.body.status) {
+          if(message.body.assignment) {
+            message.body.status = "active";
+          } else {
+            message.body.status = "idle";
+          }
         }
         that.agents[message.body.name] = message.body;
         if(that.agentNames.indexOf(message.body.name) < 0 && !(message.body.agentUndeployRequested)) {

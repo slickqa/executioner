@@ -8,7 +8,7 @@
 <ion-content>
   <ion-row class="agent-row" responsive-sm>
     <ion-card class="agent" *ngFor="let agentName of agentNames;">
-      <ion-card-header class="agent-header">
+      <ion-card-header class="agent-header status-{{agents[agentName].status}}">
         <ion-toolbar primary>
           <ion-title>{{agentName}} <span *ngIf="agents[agentName].requestedWork">(Asking)</span> <span *ngIf="agents[agentName].agentUndeployRequested">(Stopping)</span> </ion-title>
           <ion-buttons end><button round (click)="togglePaused(agentName)"><ion-icon *ngIf="agents[agentName].paused" name="play"></ion-icon><ion-icon *ngIf="!agents[agentName].paused" name="pause"></ion-icon></button></ion-buttons>

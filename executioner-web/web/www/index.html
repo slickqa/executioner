@@ -9,7 +9,25 @@
 
   <link ios-href="build/css/app.ios.css" rel="stylesheet">
   <link md-href="build/css/app.md.css" rel="stylesheet">
-  <link wp-href="build/css/app.wp.css" rel="stylesheet">  
+  <link wp-href="build/css/app.wp.css" rel="stylesheet">
+  <style>
+    .status-idle > .toolbar[primary] div.toolbar-background {
+      background-color: #387ef5;
+    }
+
+    .status-active > .toolbar[primary] div.toolbar-background {
+      background-color: #00b400;
+    }
+
+    .status-maintenance > .toolbar[primary] div.toolbar-background {
+      background-color: orange;
+    }
+
+    .status-dead > .toolbar[primary] div.toolbar-background {
+      background-color: red;
+    }
+
+  </style>
 </head>
 <body class="md">
 
