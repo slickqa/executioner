@@ -7,6 +7,7 @@ public class Addresses {
     public static final String WorkStop = "executioner.workqueue.stop";
     public static final String WorkStart = "executioner.workqueue.start";
     public static final String WorkQueueInfo = "executioner.workqueue.info";
+    public static final String WorkQueueStatistics = "executioner.workqueue.statistics";
     public static final String WorkQueueAdd = "executioner.workqueue.add";
     public static final String WorkQueueQuery = "executioner.workqueue.query";
     public static final String WorkQueueRequestWork = "executioner.workqueue.requestAssignment";

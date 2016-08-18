@@ -29,6 +29,7 @@ public class WorkQueueEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
 
     private Router router;
     private JsonArray workQueue;
+    private JsonObject workQueueStatistics;
     private EventBus eventBus;
     private ExecutionerWebConfiguration config;
     private Logger log;
@@ -39,11 +40,17 @@ public class WorkQueueEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
         this.router = router;
         this.eventBus = eventBus;
         this.config = config;
+        this.workQueueStatistics = new JsonObject();
     }
 
     @Override
     public void onStartup() {
         log.info("OnStartup called.");
+        eventBus.consumer(Addresses.WorkQueueInfo).handler(this::onWorkQueueUpdated);
+        eventBus.consumer(Addresses.WorkQueueStatistics, (Message<JsonObject> workStatsMessage) -> {
+            workQueueStatistics = workStatsMessage.body();
+        });
+
         eventBus.send(Addresses.WorkQueueQuery, null, result -> {
             if(result.succeeded()) {
                 onWorkQueueUpdated(result.result());
@@ -51,11 +58,12 @@ public class WorkQueueEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
                 log.warn("Query to get existing work queue failed: {0}", result.cause());
             }
         });
-        eventBus.consumer(Addresses.WorkQueueInfo).handler(this::onWorkQueueUpdated);
+
         router.route(HttpMethod.GET, config.getWebBasePath() + "api/workqueue").handler(this::getCurrentWorkQueue);
         router.route(HttpMethod.POST, config.getWebBasePath() + "api/workqueue").handler(this::addToWorkQueue);
         router.route(HttpMethod.GET, config.getWebBasePath() + "api/workqueue/stop").handler(this::stopWorkQueue);
         router.route(HttpMethod.GET, config.getWebBasePath() + "api/workqueue/start").handler(this::startWorkQueue);
+        router.route(HttpMethod.GET, config.getWebBasePath() + "api/workqueue/stats").handler(this::getCurrentWorkQueueStatistics);
     }
 
     public void onWorkQueueUpdated(Message<Object> message) {
@@ -73,6 +81,7 @@ public class WorkQueueEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
         options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueInfo));
         options.addInboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueQuery));
         options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueState));
+        options.addOutboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueStatistics));
         options.addInboundPermitted(new PermittedOptions().setAddress(Addresses.WorkQueueCancelItem));
     }
 
@@ -99,6 +108,13 @@ public class WorkQueueEndpoint implements OnStartup, AddsSocksJSBridgeOptions {
                 .setStatusCode(200)
                 .putHeader("Content-Type", "application/json")
                 .end(Json.encodePrettily(workQueue));
+    }
+
+    public void getCurrentWorkQueueStatistics(RoutingContext ctx) {
+        ctx.response()
+                .setStatusCode(200)
+                .putHeader("Content-Type", "application/json")
+                .end(workQueueStatistics.encodePrettily());
     }
 
     public void addToWorkQueue(RoutingContext ctx) {

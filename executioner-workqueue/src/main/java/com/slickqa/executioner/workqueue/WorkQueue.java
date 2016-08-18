@@ -1,5 +1,6 @@
 package com.slickqa.executioner.workqueue;
 
+import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 import com.slickqa.executioner.base.Addresses;
 import com.slickqa.executioner.base.AutoloadComponent;
@@ -65,9 +66,24 @@ public class WorkQueue implements OnStartup {
 
     private JsonArray workQueueMessage() {
         JsonArray retval = new JsonArray();
-        for(WorkQueueItem item : workQueue) {
+        for(WorkQueueItem item : workQueue.values()) {
             retval = retval.add(item.toJsonObject());
         }
+        return retval;
+    }
+
+    private JsonObject workQueueStatistics() {
+        JsonObject retval = new JsonObject()
+                .put("size", workQueue.size());
+
+        JsonObject byRequirements = new JsonObject();
+        for(Set<String> reqSet : workQueue.getRequirementSets()) {
+            byRequirements.put("requirementSet", new JsonArray(Lists.newArrayList(reqSet)));
+            byRequirements.put("size", workQueue.getIdsByRequirmentSet(reqSet).size());
+        }
+
+        retval.put("byRequirements", byRequirements);
+
         return retval;
     }
 
@@ -85,6 +101,7 @@ public class WorkQueue implements OnStartup {
         log.info("Publishing Work Queue.");
         eventBus.publish(WorkQueueInfo, workQueueMessage());
         eventBus.publish(Addresses.WorkQueueState, workQueueState());
+        eventBus.publish(WorkQueueStatistics, workQueueStatistics());
         resetBroadcastAfter();
     }
 
@@ -92,14 +109,14 @@ public class WorkQueue implements OnStartup {
         if(message.body() instanceof JsonArray) {
             for(Object item : (JsonArray)message.body()) {
                 if(item instanceof JsonObject) {
-                    workQueue.add(0, new WorkQueueItem((JsonObject)item));
-                    message.reply(workQueueMessage());
+                    workQueue.add(new WorkQueueItem((JsonObject)item));
                 } else {
                     log.error("Unable to add item of type {0} to work queue.", item.getClass().getName());
                 }
             }
+            message.reply(workQueueMessage());
         } else if(message.body() instanceof  JsonObject) {
-            workQueue.add(0, new WorkQueueItem((JsonObject) message.body()));
+            workQueue.add(new WorkQueueItem((JsonObject) message.body()));
             message.reply(workQueueMessage());
         } else {
             log.error("Unknown message body type({0}): {1}", message.body().getClass().getName(), message.body());
@@ -118,7 +135,6 @@ public class WorkQueue implements OnStartup {
             if(!request.containsKey(NameKey)) {
                 message.fail(20, "Must include a name of the agent in order to request work.");
             } else {
-                int itemToAssign = -1;
                 JsonArray requestProvides = request.getJsonArray(ProvidesKey);
                 if(requestProvides  == null) {
                     requestProvides = new JsonArray();
@@ -131,15 +147,8 @@ public class WorkQueue implements OnStartup {
                         log.warn("Unknown provider type ({0}): {1}", item.getClass().getName(), item.toString());
                     }
                 }
-                for (int i = workQueue.size() - 1; i >= 0; i--) {
-                    WorkQueueItem item = workQueue.get(i);
-                    if(provides.containsAll(item.getRequirements())) {
-                        itemToAssign = i;
-                        break;
-                    }
-                }
-                if(itemToAssign >= 0) {
-                    WorkQueueItem assignment = workQueue.remove(itemToAssign);
+                WorkQueueItem assignment = workQueue.removeFirstMatchingItem(provides);
+                if(assignment != null) {
                     message.reply(assignment.toJsonObject());
                     publishQueueInfo();
                 } else {
@@ -162,6 +171,7 @@ public class WorkQueue implements OnStartup {
             publishQueueInfo();
             eventBus.publish(WorkQueueItemCancelled, workItem.toJsonObject());
         } else {
+            log.error("Requested to find item in work queue, but couldn't: {}", itemToRemove.encodePrettily());
             message.fail(200, "Unable to find item in WorkQueue.");
         }
 

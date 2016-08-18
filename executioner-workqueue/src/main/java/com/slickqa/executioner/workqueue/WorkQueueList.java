@@ -1,53 +1,47 @@
 package com.slickqa.executioner.workqueue;
 
-import io.vertx.core.json.JsonObject;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Set;
+import io.vertx.core.json.JsonObject;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+
+import java.util.*;
 
 /**
  * A specialty data structure that can improve speed of looking up items.
  */
-public class WorkQueueList extends LinkedList<WorkQueueItem> {
-    protected Map<String, Integer> idMap;
-    protected Map<Set<String>, LinkedList<Integer>> requirementSetMap;
+public class WorkQueueList extends LinkedHashMap<String, WorkQueueItem> {
+    private Map<Set<String>, List<String>> requirementSetMap;
+    private Logger log;
 
     public WorkQueueList() {
         super();
-        idMap = new HashMap<>();
         requirementSetMap = new HashMap<>();
+        log = LoggerFactory.getLogger(this.getClass());
     }
 
-
-
-    @Override
-    public boolean add(WorkQueueItem workQueueItem) {
-        boolean retval = super.add(workQueueItem);
-        if(retval && workQueueItem != null) {
-            int index = size() - 1;
-            if (workQueueItem.toJsonObject().containsKey("id")) {
-                idMap.put(workQueueItem.toJsonObject().getString("id"), index);
-            }
-            if(!requirementSetMap.containsKey(workQueueItem.getRequirements())) {
-                requirementSetMap.put(workQueueItem.getRequirements(), new LinkedList<>());
-            }
-            requirementSetMap.get(workQueueItem.getRequirements()).add(index);
-        }
-        return retval;
+    public Set<Set<String>> getRequirementSets() {
+        return requirementSetMap.keySet();
     }
 
-    @Override
-    public WorkQueueItem remove(int index) {
-        WorkQueueItem item = super.remove(index);
-        if(item.toJsonObject().containsKey("id")) {
-            idMap.remove(item.toJsonObject().getString("id"));
-        }
+    public List<String> getIdsByRequirmentSet(Set<String> reqSet) {
+        return requirementSetMap.get(reqSet);
+    }
+
+    private void removeFromRequirementSetMap(WorkQueueItem item) {
         if(requirementSetMap.containsKey(item.getRequirements())) {
-            requirementSetMap.get(item.getRequirements()).remove(new Integer(index));
+            requirementSetMap.get(item.getRequirements()).remove(item.getId());
+        } else {
+            log.warn("Found work queue item that matches provides, but it isn't indexed? \nMatching requirement set: " + String.join(", ", item.getRequirements()));
+            StringBuilder allReqSets = new StringBuilder();
+            for(Set<String> reqset : requirementSetMap.keySet()) {
+                allReqSets.append("\t");
+                allReqSets.append(String.join(", ", reqset));
+                allReqSets.append("\n");
+            }
+            log.warn("Existing Requirment Sets:\n" + allReqSets.toString());
         }
-        return item;
+
     }
 
     public WorkQueueItem remove(JsonObject item) {
@@ -55,27 +49,35 @@ public class WorkQueueList extends LinkedList<WorkQueueItem> {
             return null;
         }
 
-        if(item.containsKey("id") && idMap.containsKey(item.getString("id"))) {
-            return remove(idMap.get(item.getString("id")).intValue());
-        }
-
-        // well there's no id, let's see if we can make the list smaller by using the requirement set
         WorkQueueItem temp = new WorkQueueItem(item);
-        if(requirementSetMap.containsKey(temp.getRequirements())) {
-            for(int potentialIndex : requirementSetMap.get(temp.getRequirements())) {
-                if(get(potentialIndex).matches(item)) {
-                    return remove(potentialIndex);
-                }
+        removeFromRequirementSetMap(temp);
+        // it has to have an id, otherwise it will never match anything in the queue
+        return remove(item.getString("id"));
+    }
+
+    public WorkQueueItem removeFirstMatchingItem(Set<String> provides) {
+        WorkQueueItem retval = null;
+
+        String matchingId = null;
+        for(WorkQueueItem potential : values()) {
+            if(provides.containsAll(potential.getRequirements())) {
+                matchingId = potential.getId();
+                break;
             }
         }
-
-        // this is unfortunate, we have to iterate through the whole list
-        for(int index = 0; index < size(); index++) {
-            if(get(index).matches(item)) {
-                return remove(index);
-            }
+        if(matchingId != null) {
+            retval = remove(matchingId);
+            removeFromRequirementSetMap(retval);
         }
+        return retval;
+    }
 
-        return null;
+    public void add(WorkQueueItem item) {
+        put(item.getId(), item);
+
+        if(!requirementSetMap.containsKey(item.getRequirements())) {
+            requirementSetMap.put(item.getRequirements(), new LinkedList<>());
+        }
+        requirementSetMap.get(item.getRequirements()).add(item.getId());
     }
 }

@@ -7,6 +7,7 @@ import io.vertx.core.logging.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Data Structure representing the work queue.
@@ -19,6 +20,9 @@ public class WorkQueueItem {
 
     public WorkQueueItem(JsonObject source) {
         this.source = source;
+        if(!this.source.containsKey("id")) {
+            this.source.put("id", UUID.randomUUID().toString());
+        }
         this.requirements = new HashSet<>();
         generateRequirements();
     }
@@ -49,6 +53,10 @@ public class WorkQueueItem {
             }
             return source.equals(other);
         }
+    }
+
+    public String getId() {
+        return source.getString("id");
     }
 
     public Set<String> getRequirements() {
