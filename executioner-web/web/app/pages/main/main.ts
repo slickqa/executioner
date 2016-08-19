@@ -82,6 +82,8 @@ export class MainPage {
         if(!message.body.status) {
           if(message.body.assignment) {
             message.body.status = "active";
+          } else if(message.body.paused) {
+            message.body.status = "paused";
           } else {
             message.body.status = "idle";
           }
