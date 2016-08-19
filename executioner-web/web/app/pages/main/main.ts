@@ -26,6 +26,7 @@ export class MainPage {
   public externalRequest: any;
   public externalRequestInProgress: boolean;
   public live: boolean;
+  public statusTotals: any;
 
   constructor(nav: NavController) {
     window.mainpage = this;
@@ -33,6 +34,13 @@ export class MainPage {
     var that = this;
     var location: string;
     this.live = false;
+    this.statusTotals = {
+      idle: 0,
+      active: 0,
+      maintenance: 0,
+      dead: 0,
+      paused: 0
+    };
     this.workqueueState = {'stopped': false};
     this.externalRequest = {};
     this.externalRequestInProgress = false;
@@ -88,6 +96,10 @@ export class MainPage {
             message.body.status = "idle";
           }
         }
+        if(message.body.name in that.agents) {
+          that.statusTotals[that.agents[message.body.name].status]--;
+        }
+        that.statusTotals[message.body.status]++;
         that.agents[message.body.name] = message.body;
         if(that.agentNames.indexOf(message.body.name) < 0 && !(message.body.agentUndeployRequested)) {
           that.agentNames.push(message.body.name);
