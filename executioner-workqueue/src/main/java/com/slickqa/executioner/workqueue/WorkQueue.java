@@ -76,10 +76,14 @@ public class WorkQueue implements OnStartup {
         JsonObject retval = new JsonObject()
                 .put("size", workQueue.size());
 
-        JsonObject byRequirements = new JsonObject();
+        JsonArray byRequirements = new JsonArray();
         for(Set<String> reqSet : workQueue.getRequirementSets()) {
-            byRequirements.put("requirementSet", new JsonArray(Lists.newArrayList(reqSet)));
-            byRequirements.put("size", workQueue.getIdsByRequirmentSet(reqSet).size());
+            if(workQueue.getIdsByRequirmentSet(reqSet).size() > 0) {
+                byRequirements.add(new JsonObject()
+                        .put("requirementSet", new JsonArray(Lists.newArrayList(reqSet)))
+                        .put("size", workQueue.getIdsByRequirmentSet(reqSet).size())
+                );
+            }
         }
 
         retval.put("byRequirements", byRequirements);
