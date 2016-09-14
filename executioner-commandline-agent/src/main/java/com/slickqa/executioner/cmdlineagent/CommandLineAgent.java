@@ -6,6 +6,7 @@ import com.slickqa.executioner.base.AutoloadComponent;
 import com.slickqa.executioner.base.OnStartup;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.file.FileSystem;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
@@ -17,6 +18,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Date;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -37,6 +40,7 @@ public class CommandLineAgent implements OnStartup {
     protected Logger log;
     protected JsonObject currentWork;
     protected Long imageLastModified;
+    protected int workQueueSize;
 
     @Inject
     public CommandLineAgent(EventBus eventBus, CommandLineAgentConfiguration config, Vertx vertx, FileSystem fs) {
@@ -58,6 +62,7 @@ public class CommandLineAgent implements OnStartup {
         this.currentWork = null;
         this.imageLastModified = null;
         this.readingFile = false;
+        this.workQueueSize = 0;
     }
 
     @Override
@@ -67,17 +72,7 @@ public class CommandLineAgent implements OnStartup {
         eventBus.consumer(Addresses.AgentBaseAddress + config.getAgentName())
                 .handler(message -> message.reply(agentUpdateObject()));
 
-        eventBus.consumer(Addresses.WorkQueueInfo).handler(workQueueMessage -> {
-            if(workQueueMessage.body() instanceof JsonArray) {
-                JsonArray workQueue = (JsonArray) workQueueMessage.body();
-                if(workQueue.size() > 0) {
-                    askForWork();
-                }
-            } else {
-                log.error("Work queue message of type ({0}) instead of JsonArray.",
-                          workQueueMessage.body().getClass().getName());
-            }
-        });
+        eventBus.consumer(Addresses.WorkQueueInfo, (Message<JsonArray> workQueueMessage) -> this.workQueueSize = workQueueMessage.body().size());
         eventBus.consumer(Addresses.AgentStopBaseAddress + config.getAgentName()).handler(message -> {
             timeToStop = true;
             message.reply(agentUpdateObject());
@@ -99,6 +94,13 @@ public class CommandLineAgent implements OnStartup {
 
         // try to avoid every agent polling at the exact same time
         vertx.setPeriodic(ThreadLocalRandom.current().nextInt(600, 800), this::checkForImageUpdate);
+
+        // ask for work every 3-4 seconds if there is work in the work queue
+        vertx.setPeriodic(new Random(new Date().getTime()).nextInt((4000 - 3000) + 1) + 3000, id -> {
+            if(workQueueSize > 0) {
+                askForWork();
+            }
+        });
         broadcastInfo();
     }
 
