@@ -32,6 +32,9 @@ public class WorkQueueList extends LinkedHashMap<String, WorkQueueItem> {
         if(requirementSetMap.containsKey(item.getRequirements())) {
             requirementSetMap.get(item.getRequirements()).remove(item.getId());
         } else {
+            if(item.getId() != null) {
+                requirementSetMap.forEach((Set<String> key, List<String> value) -> value.remove(item.getId()));
+            }
             log.warn("Found work queue item that matches provides, but it isn't indexed? \nMatching requirement set: " + String.join(", ", item.getRequirements()));
             StringBuilder allReqSets = new StringBuilder();
             for(Set<String> reqset : requirementSetMap.keySet()) {
