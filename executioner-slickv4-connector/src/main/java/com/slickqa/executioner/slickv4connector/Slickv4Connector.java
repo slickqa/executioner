@@ -134,7 +134,7 @@ public class Slickv4Connector implements OnStartup {
             JsonObject attributes = result.getJsonObject("attributes");
             for(String attrName : attributes.fieldNames()) {
                 if("required".equals(attributes.getString(attrName))) {
-                    requirements.add(attrName);
+                    requirements.add(attrName.toLowerCase());
                 }
             }
         }
